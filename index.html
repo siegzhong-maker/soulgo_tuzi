@@ -136,9 +136,9 @@
         .cabinet-modal .memory-cabinet-tier-scroll {
             display: flex;
             align-items: stretch;
-            gap: 0.45rem;
+            gap: 0.5rem;
             overflow-x: auto;
-            padding: 0.1rem 0.1rem 0.25rem;
+            padding: 0.15rem 0.15rem 0.3rem;
         }
         .cabinet-modal .memory-cabinet-tier-scroll.no-scrollbar::-webkit-scrollbar {
             display: none;
@@ -148,8 +148,12 @@
             scrollbar-width: none;
         }
         .cabinet-modal .cabinet-slot {
-            min-width: 92px;
-            max-width: 108px;
+            /* 固定弹窗内格子尺寸，保证同一行对齐 */
+            flex: 0 0 102px;
+            width: 102px;
+            min-width: 102px;
+            max-width: 102px;
+            height: 132px;
         }
         /* 橱柜弹窗网格：3 列 4 行等高，格子统一高度 */
         .cabinet-modal-grid-equal-rows {
@@ -174,6 +178,7 @@
             line-clamp: 3;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            max-height: 3.6em;
         }
 
         /* 导航切换动画 */

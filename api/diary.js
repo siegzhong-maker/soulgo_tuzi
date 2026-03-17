@@ -26,13 +26,15 @@ const DIARY_SYSTEM_PROMPT = `你是一只旅行电子宠物，用第一人称给
 - 字数控制在 80～200 字之间，不要太短，也不要写成长篇小说。
 
 【输入字段】
-我会提供一段 JSON，里面包含：
+我会提供一段 JSON，里面包含（可能部分字段为空或缺失）：
 - date: 当前日期
 - location: 本次打卡地点（打卡点）
 - petPersonality: 宠物性格（如“小火苗”等）
 - ownerTitle: 宠物平时对主人的称呼（如“伙伴”“训练家”等）
 - episodicMemories: 相关的近期旅行记忆摘要数组，每条是简短的一两句话
-- semanticTraits: 长期偏好/性格碎片（例如：爱美食），由“性格 + 爱好”组合决定
+- semanticTraits: 由“性格 + 爱好 + 性格碎片关键词”组合的长期偏好标签（例如：爱美食、爱发呆）
+- semanticProfile: 人格设定快照（可能包含 identity/偏好/不喜欢/小能力/说话风格描述/称呼你 等）
+- habitSummaries: 最近的小习惯一句话列表（如“经常在夜里写日记”“总是绕路去咖啡馆”）
 
 【你要输出的 JSON（必须严格使用此结构）】
 只输出一行 JSON，不能有其他任何文字、解释或 markdown：
@@ -89,7 +91,9 @@ function buildDiaryUserPrompt(payload, episodicMemories, semanticTraits) {
     location,
     petPersonality,
     ownerTitle,
-    language
+    language,
+    semanticProfileSnapshot,
+    habitSummaries
   } = payload || {};
 
   const safeDate = date || '';
@@ -97,6 +101,8 @@ function buildDiaryUserPrompt(payload, episodicMemories, semanticTraits) {
   const safePersonality = petPersonality || '小火苗';
   const safeOwnerTitle = ownerTitle || '伙伴';
   const safeLanguage = language || 'zh-CN';
+  const semanticProfile = semanticProfileSnapshot || null;
+  const safeHabitSummaries = Array.isArray(habitSummaries) ? habitSummaries.slice(0, 5) : [];
 
   const em = Array.isArray(episodicMemories) ? episodicMemories : [];
   const traits = Array.isArray(semanticTraits) ? semanticTraits : [];
@@ -108,7 +114,9 @@ function buildDiaryUserPrompt(payload, episodicMemories, semanticTraits) {
     ownerTitle: safeOwnerTitle,
     language: safeLanguage,
     episodicMemories: em,
-    semanticTraits: traits
+    semanticTraits: traits,
+    semanticProfile,
+    habitSummaries: safeHabitSummaries
   };
 
   return `下面是本次写日记需要的上下文 JSON（你只需要阅读，不要原样返回）：
@@ -117,7 +125,7 @@ ${JSON.stringify(ctx, null, 2)}
 请根据上面的信息，按照系统提示要求，返回一行严格符合格式的 JSON。`;
 }
 
-async function fetchRagMemories(location, petPersonality) {
+async function fetchRagMemories(location, petPersonality, semanticProfileSnapshot, habitSummaries) {
   try {
     const queryPieces = [];
     const personalityLabel = petPersonality ? String(petPersonality) : '';
@@ -125,6 +133,24 @@ async function fetchRagMemories(location, petPersonality) {
     if (personalityLabel) queryPieces.push(personalityLabel);
     if (hobby) queryPieces.push(hobby);
     if (location) queryPieces.push(String(location));
+
+    const preferenceKeywords = [];
+    const dislikeKeywords = [];
+    if (semanticProfileSnapshot && semanticProfileSnapshot.preferences) {
+      const { food, dislikes, abilities } = semanticProfileSnapshot.preferences;
+      if (food) preferenceKeywords.push(String(food));
+      if (abilities) preferenceKeywords.push(String(abilities));
+      if (dislikes) dislikeKeywords.push(String(dislikes));
+    }
+
+    const habitList = Array.isArray(habitSummaries) ? habitSummaries : [];
+    const habitKeywords = habitList
+      .map((s) => (s ? String(s) : ''))
+      .filter((s) => s && s.trim())
+      .slice(0, 5);
+
+    queryPieces.push(...preferenceKeywords, ...habitKeywords);
+
     const query = queryPieces.join(' ');
 
     const res = await fetch(new URL('/api/retrieve', process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'), {
@@ -137,13 +163,44 @@ async function fetchRagMemories(location, petPersonality) {
     const data = await res.json();
     if (!data || !Array.isArray(data.memories)) return [];
 
-    return data.memories.map((m) => {
+    const prefsForBoost = preferenceKeywords
+      .map((s) => s.split(/[，,。.\s]/).filter(Boolean))
+      .flat()
+      .slice(0, 6);
+    const dislikesForBoost = dislikeKeywords
+      .map((s) => s.split(/[，,。.\s]/).filter(Boolean))
+      .flat()
+      .slice(0, 6);
+
+    const scored = data.memories.map((m, idx) => {
       const content = typeof m.content === 'string' ? m.content : '';
       const meta = m.metadata || {};
-      const date = meta.date || '';
-      const loc = meta.location || '';
-      return `${date ? `${date} · ` : ''}${loc ? `${loc} · ` : ''}${content}`;
-    }).filter(Boolean).slice(0, 4);
+      const textForMatch = `${content} ${JSON.stringify(meta)}`;
+      let boost = 0;
+      prefsForBoost.forEach((kw) => {
+        if (kw && textForMatch.includes(kw)) boost += 0.2;
+      });
+      dislikesForBoost.forEach((kw) => {
+        if (kw && textForMatch.includes(kw)) boost -= 0.2;
+      });
+      return { m, idx, boost };
+    });
+
+    scored.sort((a, b) => {
+      if (b.boost === a.boost) return a.idx - b.idx;
+      return b.boost - a.boost;
+    });
+
+    return scored
+      .map(({ m }) => {
+        const content = typeof m.content === 'string' ? m.content : '';
+        const meta = m.metadata || {};
+        const date = meta.date || '';
+        const loc = meta.location || '';
+        return `${date ? `${date} · ` : ''}${loc ? `${loc} · ` : ''}${content}`;
+      })
+      .filter(Boolean)
+      .slice(0, 4);
   } catch {
     return [];
   }
@@ -231,10 +288,24 @@ export async function POST(request) {
     );
   }
 
-  // 1. RAG 检索：拿到若干条相关记忆作为 episodicMemories（由性格 + 爱好 + 打卡点组成查询）
-  const episodicMemories = await fetchRagMemories(location, petPersonality);
+  const semanticProfileSnapshot = payload.semanticProfileSnapshot || null;
+  const habitSummaries = Array.isArray(payload.habitSummaries) ? payload.habitSummaries : [];
+
+  // 1. RAG 检索：拿到若干条相关记忆作为 episodicMemories（由性格 + 爱好 + 打卡点 + 性格碎片与小习惯关键词组成查询）
+  const episodicMemories = await fetchRagMemories(location, petPersonality, semanticProfileSnapshot, habitSummaries);
   const hobby = getHobbyForPersonality(petPersonality);
-  const semanticTraits = hobby ? [hobby] : [];
+  const semanticTraits = [];
+  if (hobby) semanticTraits.push(hobby);
+  if (semanticProfileSnapshot && semanticProfileSnapshot.preferences) {
+    const { food, abilities } = semanticProfileSnapshot.preferences;
+    if (food) semanticTraits.push(String(food));
+    if (abilities) semanticTraits.push(String(abilities));
+  }
+  if (Array.isArray(habitSummaries)) {
+    habitSummaries.slice(0, 3).forEach((s) => {
+      if (s && String(s).trim()) semanticTraits.push(String(s).trim());
+    });
+  }
 
   // 2. 调用 OpenRouter 生成统一 JSON
   const userPrompt = buildDiaryUserPrompt(payload, episodicMemories, semanticTraits);

@@ -6647,62 +6647,17 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             ? '<button type="button" id="memory-history-expand-more" class="mt-1 mb-2 text-[11px] text-teal-600 hover:text-teal-700 font-medium">查看更多（还剩 ' + historyRemaining + ' 条）</button>'
             : '';
         const travelCardsHTML = currentMemoryTab === 'travel' && (travelCardsWithIndex.length > 0 || dailyCardsWithIndex.length > 0)
-            ? '<div class="flex flex-col gap-0">' + currentSection + historySection + historyMoreBtnHTML + '</div>'
+            ? '<div class="flex flex-col gap-2">' +
+                '<div class="pb-1 border-b border-gray-100">' + currentSection + '</div>' +
+                historySection +
+                historyMoreBtnHTML +
+              '</div>'
             : '';
         const travelEmptyHTML = (currentMemoryTab === 'travel' && travelCardsWithIndex.length === 0 && dailyCardsWithIndex.length === 0)
             ? '<div class="flex flex-col items-center justify-center text-center text-xs text-gray-500 py-4 gap-2"><p>我还没有记下这类呢，先带我去地图打一次卡吧～</p><button type="button" class="mt-1 px-3 py-1.5 rounded-full bg-[#ff8fab] text-white text-[11px] font-bold shadow-sm hover:bg-[#ff7b9c] active:scale-95 transition" id="memory-travel-goto-map">去地图打卡</button></div>'
             : '';
 
-        // 最近的小习惯：从 habit 取最近 N 条（含 interaction），按时间逆序
-        const recentHabits = (appState.memories && appState.memories.habit)
-            ? [...appState.memories.habit]
-                .sort((a, b) => {
-                    const ta = (a.timestamp || a.generated_at || 0) ? new Date(a.timestamp || a.generated_at).getTime() : 0;
-                    const tb = (b.timestamp || b.generated_at || 0) ? new Date(b.timestamp || b.generated_at).getTime() : 0;
-                    return tb - ta;
-                })
-                .slice(0, 8)
-            : [];
-        const episodicCountForHabits = travelList.length + dailyList.length;
-        const habitsCollapsible = episodicCountForHabits >= 3;
-        const habitsContentHTML = recentHabits.map((h) => {
-            const isInteraction = h.type === 'interaction';
-            const label = isInteraction ? (h.summary || '') : ('经常… ' + (h.summary || ''));
-            const dateStr = (h.timestamp || h.generated_at) ? (function () { const d = new Date(h.timestamp || h.generated_at); return d.toLocaleDateString ? d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : (h.timestamp || h.generated_at || '').slice(0, 10); }()) : '';
-            return '<div class="memory-card bg-teal-50/60 rounded-lg p-2.5 border border-teal-100 text-left"><span class="text-[10px] text-teal-600 mr-1">' + (isInteraction ? '·' : '') + '</span><span class="text-xs text-gray-700">' + escapeHtml(label) + '</span>' + (dateStr ? '<div class="text-[10px] text-gray-400 mt-1">' + escapeHtml(dateStr) + '</div>' : '') + '</div>';
-        }).join('');
-        const recentHabitsSectionHTML = (currentMemoryTab === 'travel' && recentHabits.length > 0)
-            ? (habitsCollapsible
-                ? '<div class="mb-3 memory-collapsible-section" data-section="habits">' +
-                    '<button type="button" class="memory-collapse-toggle w-full flex items-center justify-between text-left py-1 rounded hover:bg-gray-50">' +
-                    '<div class="flex items-center gap-1 text-[11px] font-semibold text-gray-500"><i class="ph-fill ph-footprints text-amber-500 text-xs"></i><span>最近的小习惯</span></div>' +
-                    '<span class="text-[10px] text-teal-600">' + (memoryHabitsExpanded ? '收起' : '展开') + '</span></button>' +
-                    (memoryHabitsExpanded ? '<div class="flex flex-col gap-2 mt-1">' + habitsContentHTML + '</div>' : '') +
-                    '</div>'
-                : '<div class="mb-3"><div class="flex items-center justify-between text-[11px] font-semibold text-gray-500 mb-1"><div class="flex items-center gap-1"><i class="ph-fill ph-footprints text-amber-500 text-xs"></i><span>最近的小习惯</span></div><span class="text-[10px] text-gray-400">累计 ' + habitTotal + ' 条</span></div><div class="flex flex-col gap-2">' + habitsContentHTML + '</div></div>')
-            : '';
-
-        // 旅行记忆增长小图：默认展开，空状态显示占位
-        const episodicTimeline = (stats.episodicTimeline && stats.episodicTimeline.length) ? stats.episodicTimeline : [];
-        const maxDailyTotal = episodicTimeline.reduce((max, d) => Math.max(max, d.total || 0), 0) || 1;
-        const chartContentHTML = episodicTimeline.length > 0
-            ? episodicTimeline.map((d) => {
-                const total = d.total || 0;
-                const heightPct = Math.max(8, Math.round((total / maxDailyTotal) * 100));
-                const label = (d.date || '').slice(5);
-                return '<div class="flex-1 flex flex-col items-center justify-end gap-0.5">' +
-                    '<div class="w-2.5 rounded-t-full bg-teal-300" style="height:' + heightPct + '%" title="' + escapeHtml((d.date || '') + '：' + total + ' 条记忆') + '"></div>' +
-                    '<div class="text-[9px] text-gray-400">' + escapeHtml(label) + '</div></div>';
-            }).join('')
-            : '<div class="w-full flex items-center justify-center py-4 text-[11px] text-gray-400">暂无数据，打卡后会在这里显示每日记忆数量</div>';
-        const episodicChartHTML = (currentMemoryTab === 'travel')
-            ? '<div class="mb-3 memory-collapsible-section" data-section="chart">' +
-                '<button type="button" class="memory-collapse-toggle w-full flex items-center justify-between text-left text-[11px] font-semibold text-gray-500 py-1 rounded hover:bg-gray-50">' +
-                '<span>最近的记忆增长</span>' +
-                '<span class="text-[10px] text-teal-600">' + (memoryChartExpanded ? '收起' : '展开') + '</span></button>' +
-                (memoryChartExpanded ? '<div class="flex items-end gap-1 h-16 px-1 bg-gray-50 rounded-lg border border-gray-100 mt-1 min-h-[4rem]">' + chartContentHTML + '</div>' : '') +
-                '</div>'
-            : '';
+        // 最近的小习惯和旅行记忆增长小图已移除，避免信息过载
 
         function truncateText(text, maxLength) {
             const str = (text || '').trim();
@@ -6832,7 +6787,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
 
         const characterEmptyHTML = (currentMemoryTab === 'character' && !(profile && profile.identity) && habits.length === 0) ? '<div class="flex flex-col items-center justify-center text-center text-xs text-gray-500 py-4 gap-2"><p>我还没有记下这类呢。</p></div>' : '';
 
-        const travelPanelHTML = currentMemoryTab === 'travel' ? (episodicChartHTML + recentHabitsSectionHTML + (travelCardsHTML || travelEmptyHTML)) : '';
+        const travelPanelHTML = currentMemoryTab === 'travel' ? (travelCardsHTML || travelEmptyHTML) : '';
         const characterPanelHTML = currentMemoryTab === 'character' ? (identityBlock + interactionVisualHTML + habitCardsHTML + (characterEmptyHTML && !identityBlock && !habitCardsHTML ? characterEmptyHTML : '')) : '';
 
         // 心情 / 体力趋势概览：使用当前标签和简单文案

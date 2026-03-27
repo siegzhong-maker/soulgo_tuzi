@@ -7,7 +7,7 @@ Usage:
 """
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from PIL import Image
 from psd_tools import PSDImage
@@ -16,6 +16,9 @@ from psd_tools import PSDImage
 ROOT = Path(__file__).resolve().parents[1]
 PSD_PATH = ROOT / "比卡丘动画导出" / "tuzi.psd"
 OUT_DIR = ROOT / "兔子动画导出"
+CANVAS_SIZE = (720, 1100)
+TARGET_BODY_HEIGHT_RATIO = 0.78
+ANCHOR_BOTTOM_PX = 48
 
 # NOTE:
 # Layer indices are discovered from current PSD and grouped into action-like loops.
@@ -48,22 +51,62 @@ def layer_to_rgba(psd: PSDImage, layer_idx: int) -> Image.Image:
     return im
 
 
-def center_pad(frames: List[Image.Image], canvas_size=(720, 1100)) -> List[Image.Image]:
+def trim_transparent(img: Image.Image) -> Tuple[Image.Image, Tuple[int, int, int, int]]:
+    alpha = img.getchannel("A")
+    bbox = alpha.getbbox()
+    if not bbox:
+        w, h = img.size
+        return img, (0, 0, w, h)
+    return img.crop(bbox), bbox
+
+
+def normalize_frame(
+    frame: Image.Image,
+    canvas_size: Tuple[int, int],
+    target_body_height_ratio: float,
+    anchor_bottom_px: int,
+) -> Tuple[Image.Image, float, Tuple[int, int, int, int]]:
     cw, ch = canvas_size
-    padded: List[Image.Image] = []
+    cropped, src_bbox = trim_transparent(frame)
+    fw, fh = cropped.size
+
+    target_body_height = max(1, int(ch * target_body_height_ratio))
+    scale = target_body_height / max(1, fh)
+    new_w = max(1, int(round(fw * scale)))
+    new_h = max(1, int(round(fh * scale)))
+
+    # Avoid overflow to keep every frame inside canvas.
+    if new_w > cw or new_h > ch:
+        fit_scale = min(cw / max(1, new_w), ch / max(1, new_h))
+        scale *= fit_scale
+        new_w = max(1, int(round(fw * scale)))
+        new_h = max(1, int(round(fh * scale)))
+
+    resized = cropped.resize((new_w, new_h), Image.LANCZOS)
+
+    canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+    x = (cw - new_w) // 2
+    # Bottom anchor: keep feet baseline stable.
+    y = max(0, ch - anchor_bottom_px - new_h)
+    canvas.alpha_composite(resized, (x, y))
+    return canvas, scale, src_bbox
+
+
+def normalize_frames(frames: List[Image.Image]) -> Tuple[List[Image.Image], List[float], List[Tuple[int, int, int, int]]]:
+    normalized: List[Image.Image] = []
+    scales: List[float] = []
+    bboxes: List[Tuple[int, int, int, int]] = []
     for frame in frames:
-        fw, fh = frame.size
-        # Keep each frame within common canvas while preserving aspect.
-        if fw > cw or fh > ch:
-            ratio = min(cw / fw, ch / fh)
-            frame = frame.resize((max(1, int(fw * ratio)), max(1, int(fh * ratio))), Image.LANCZOS)
-            fw, fh = frame.size
-        canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
-        x = (cw - fw) // 2
-        y = (ch - fh) // 2
-        canvas.alpha_composite(frame, (x, y))
-        padded.append(canvas)
-    return padded
+        out, scale, bbox = normalize_frame(
+            frame,
+            canvas_size=CANVAS_SIZE,
+            target_body_height_ratio=TARGET_BODY_HEIGHT_RATIO,
+            anchor_bottom_px=ANCHOR_BOTTOM_PX,
+        )
+        normalized.append(out)
+        scales.append(scale)
+        bboxes.append(bbox)
+    return normalized, scales, bboxes
 
 
 def save_gif(frames: List[Image.Image], out_path: Path, duration_ms: int) -> None:
@@ -90,11 +133,15 @@ def main() -> None:
 
     for filename, layer_indices in ACTION_LAYERS.items():
         raw_frames = [layer_to_rgba(psd, idx) for idx in layer_indices]
-        frames = center_pad(raw_frames)
+        frames, scales, bboxes = normalize_frames(raw_frames)
         out_path = OUT_DIR / filename
         duration_ms = ACTION_DURATION_MS.get(filename, 140)
         save_gif(frames, out_path, duration_ms)
+        scales_text = ", ".join(f"{v:.3f}" for v in scales)
+        bbox_text = ", ".join(f"{b[2]-b[0]}x{b[3]-b[1]}" for b in bboxes)
         print(f"Exported {out_path}")
+        print(f"  normalize scale: [{scales_text}]")
+        print(f"  source bbox: [{bbox_text}]")
 
     print("Rabbit GIF export finished.")
 

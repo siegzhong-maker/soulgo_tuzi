@@ -2,10 +2,11 @@
 /**
  * Vercel Serverless Function: Generate image using OpenRouter API.
  * 
- * Input: { "prompt": "string", "model": "optional_string" }
+ * Input: { "prompt": "string", "model": "optional_string", "reference_image_url": "https://...", "reference_image_data_url": "data:image/..." }
  * Output: { "image_url": "string (base64 or http url)" }
  */
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MAX_REFERENCE_DATA_URL_LEN = 6 * 1024 * 1024;
 
 export async function POST(request) {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -26,7 +27,7 @@ export async function POST(request) {
         );
     }
 
-    const { prompt, model: userModel } = body;
+    const { prompt, model: userModel, reference_image_url, reference_image_data_url } = body;
     if (!prompt) {
         return new Response(
             JSON.stringify({ error: 'missing_prompt', message: 'Prompt is required.' }),
@@ -34,21 +35,48 @@ export async function POST(request) {
         );
     }
 
+    let referenceImageUrlForModel = null;
+    if (typeof reference_image_data_url === 'string') {
+        const d = reference_image_data_url.trim();
+        if (d.startsWith('data:image/') && d.includes('base64,')) {
+            if (d.length > MAX_REFERENCE_DATA_URL_LEN) {
+                return new Response(
+                    JSON.stringify({ error: 'reference_too_large', message: 'Reference image data URL exceeds size limit.' }),
+                    { status: 400, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
+            referenceImageUrlForModel = d;
+        }
+    } else if (typeof reference_image_url === 'string') {
+        const u = reference_image_url.trim();
+        if (/^https:\/\//i.test(u) && u.length <= 2048) {
+            referenceImageUrlForModel = u;
+        }
+    }
+
     // 约束：不在图中生成任何文字，避免乱码
     const noTextInstruction = 'Important: The image must not contain any text, words, letters, signs, labels, captions, or writing. No text overlay. Pure visual scene only. ';
-    const finalPrompt = noTextInstruction + prompt;
+    const referenceInstruction = referenceImageUrlForModel
+        ? 'The attached reference image shows the exact mascot IP. Recreate the SAME character: same face shape, eyes, ears, body proportions, outfit, hat, collar, bag, camera, paw colors, and overall illustration style. Only change the environment, pose, and lighting to match the scene below. Do not invent a different rabbit or generic mascot. '
+        : '';
+    const finalPrompt = noTextInstruction + referenceInstruction + prompt;
 
     // Prefer environment variable, then user input, then default (image-capable model)
     // Use google/gemini-2.5-flash-image; -preview suffix can 404 on OpenRouter
     const model = process.env.OPENROUTER_IMAGE_MODEL || userModel || 'google/gemini-2.5-flash-image';
+
+    const userContent = [{ type: 'text', text: finalPrompt }];
+    if (referenceImageUrlForModel) {
+        userContent.push({ type: 'image_url', image_url: { url: referenceImageUrlForModel } });
+    }
 
     const payload = {
         model,
         messages: [
             {
                 role: 'user',
-                // Use array format for better Gemini compatibility (per OpenRouter docs)
-                content: [{ type: 'text', text: finalPrompt }]
+                // Text first, then reference image (OpenRouter multimodal convention)
+                content: userContent
             }
         ],
         // OpenRouter: use ["image", "text"] for multimodal models (e.g. Gemini)

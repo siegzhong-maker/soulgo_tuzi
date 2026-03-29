@@ -1632,6 +1632,8 @@
         ownerTitle: '伙伴',
         // 每篇日记绑定的本地插图（仅前端存储）
         diaryImages: {},
+        // 每篇日记每张图的 Soul 点评 { [diaryId]: { [imageIndex]: string } }
+        diaryImageComments: {},
         // 宠物记忆：情景记忆（旅行打卡点）+ 语义记忆（个性描述）+ 人格设定 + 习惯总结
         memories: {
             episodic: [],
@@ -1739,6 +1741,9 @@
                     // 演示逻辑：确保 collectibleLocations 为数组
                     if (!Array.isArray(appState.collectibleLocations)) {
                         appState.collectibleLocations = [];
+                    }
+                    if (!appState.diaryImageComments || typeof appState.diaryImageComments !== 'object') {
+                        appState.diaryImageComments = {};
                     }
                     // 地图图钉：存储归一化坐标，渲染时再换算以适配布局变化
                     if (!Array.isArray(appState.mapPins)) {
@@ -2077,6 +2082,13 @@
     if (typeof window.PET_DECIDE_API_URL !== 'string' || !window.PET_DECIDE_API_URL) {
         window.PET_DECIDE_API_URL = '/api/pet/decide';
     }
+    const PET_DECIDE_MIN_INTERVAL_MS = 12000;
+    const PET_DECIDE_FETCH_TIMEOUT_MS = 5000;
+    const PET_DECIDE_CIRCUIT_MAX_FAILS = 3;
+    const PET_DECIDE_CIRCUIT_COOLDOWN_MS = 45000;
+    let petDecideLastNetworkAt = 0;
+    let petDecideConsecutiveFails = 0;
+    let petDecideCircuitOpenUntil = 0;
     const OPENROUTER_MODEL_ID = 'google/gemini-2.0-flash-001';
 
     // AIGC 配置缺失时，在开发环境给出温和提示
@@ -3277,22 +3289,60 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             });
         };
 
-        if (typeof window.PET_DECIDE_API_URL === 'string' && window.PET_DECIDE_API_URL) {
-            return fetch(window.PET_DECIDE_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-                .then(res => res.ok ? res.json() : null)
-                .then(data => {
-                    if (data && data.intent) {
-                        return { intent: data.intent, reason: data.reason };
-                    }
-                    return tryLocalDecision();
-                })
-                .catch(() => tryLocalDecision());
+        if (typeof window.PET_DECIDE_API_URL !== 'string' || !window.PET_DECIDE_API_URL) {
+            return tryLocalDecision();
         }
-        return tryLocalDecision();
+
+        const now = Date.now();
+        if (now < petDecideCircuitOpenUntil) {
+            return tryLocalDecision();
+        }
+        if (now - petDecideLastNetworkAt < PET_DECIDE_MIN_INTERVAL_MS) {
+            return tryLocalDecision();
+        }
+
+        petDecideLastNetworkAt = now;
+
+        const markPetDecideFailure = () => {
+            petDecideConsecutiveFails += 1;
+            if (petDecideConsecutiveFails >= PET_DECIDE_CIRCUIT_MAX_FAILS) {
+                petDecideCircuitOpenUntil = Date.now() + PET_DECIDE_CIRCUIT_COOLDOWN_MS;
+                petDecideConsecutiveFails = 0;
+            }
+        };
+        const markPetDecideSuccess = () => {
+            petDecideConsecutiveFails = 0;
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), PET_DECIDE_FETCH_TIMEOUT_MS);
+
+        return fetch(window.PET_DECIDE_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        })
+            .then((res) => {
+                clearTimeout(timeoutId);
+                if (!res.ok) {
+                    markPetDecideFailure();
+                    return null;
+                }
+                return res.json();
+            })
+            .then((data) => {
+                if (data && data.intent) {
+                    markPetDecideSuccess();
+                    return { intent: data.intent, reason: data.reason };
+                }
+                return tryLocalDecision();
+            })
+            .catch(() => {
+                clearTimeout(timeoutId);
+                markPetDecideFailure();
+                return tryLocalDecision();
+            });
     }
 
     function decisionFromIntent(intent) {
@@ -5813,6 +5863,246 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
     // --- 日记插图：事件委托与文件读取 ---
     let currentDiaryForImage = null;
 
+    const DIARY_SOUL_COMMENT_API = '/api/diary-image-comment';
+
+    function ensureDiaryImageCommentsMap(diaryId) {
+        if (!appState.diaryImageComments) appState.diaryImageComments = {};
+        const id = String(diaryId);
+        if (!appState.diaryImageComments[id]) appState.diaryImageComments[id] = {};
+        return appState.diaryImageComments[id];
+    }
+
+    function getDiaryLocationForDiaryImage(diaryId) {
+        const episodic = (appState.memories && appState.memories.episodic) ? appState.memories.episodic : [];
+        const m = episodic.find((x) => String(x.diaryId) === String(diaryId));
+        return m ? String(m.location || m.location_city || '').trim() : '';
+    }
+
+    function getDiaryTextSnippetForComment(diaryId) {
+        const episodic = (appState.memories && appState.memories.episodic) ? appState.memories.episodic : [];
+        const m = episodic.find((x) => String(x.diaryId) === String(diaryId));
+        const t = m ? (m.narration || m.text || m.summary || '') : '';
+        return String(t).replace(/\s+/g, ' ').trim().slice(0, 120);
+    }
+
+    function soulCommentBodyClass() {
+        return 'diary-soul-comment-body mt-1 w-full max-w-[16rem] rounded-lg bg-[#fffaf0]/90 border border-[#8d6e63]/20 px-2 py-1.5 text-[11px] leading-snug text-[#5d4037]';
+    }
+
+    function setSoulCommentBlockUI(rootEl, diaryId, imageIndex, phase, text) {
+        if (!rootEl) return;
+        const body = rootEl.querySelector('.diary-soul-comment-body');
+        const btn = rootEl.querySelector('.diary-soul-comment');
+        if (btn) {
+            if (phase === 'loading') {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }
+        if (!body) return;
+        if (phase === 'empty') {
+            body.classList.add('hidden');
+            body.innerHTML = '';
+            return;
+        }
+        body.classList.remove('hidden');
+        if (phase === 'loading') {
+            body.innerHTML = '<div class="flex items-center gap-2 text-[#8d6e63]"><div class="w-3 h-3 border-2 border-[#ff8fab] border-t-transparent rounded-full animate-spin flex-shrink-0"></div><span>兔兔正在看这张照片…</span></div>';
+            return;
+        }
+        if (phase === 'error') {
+            body.innerHTML = '<span class="text-gray-500">' + escapeHtml(text || '暂时评不了，稍后再试～') + '</span>';
+            return;
+        }
+        body.textContent = text || '';
+    }
+
+    function syncAllSoulCommentBlocksForSlot(diaryId, imageIndex) {
+        const id = String(diaryId);
+        const idx = String(imageIndex);
+        const map = (appState.diaryImageComments && appState.diaryImageComments[id]) ? appState.diaryImageComments[id] : null;
+        const saved = map && map[idx] ? String(map[idx]).trim() : '';
+        const phase = saved ? 'text' : 'empty';
+        const text = saved;
+        document.querySelectorAll('.diary-soul-comment-wrap[data-diary-id="' + id + '"][data-image-index="' + idx + '"]').forEach((root) => {
+            if (phase === 'empty') setSoulCommentBlockUI(root, id, imageIndex, 'empty', '');
+            else setSoulCommentBlockUI(root, id, imageIndex, 'text', text);
+        });
+    }
+
+    function updateSoulCommentAfterRequest(diaryId, imageIndex, phase, text) {
+        const id = String(diaryId);
+        const idx = String(imageIndex);
+        if (phase === 'text' && text) {
+            const m = ensureDiaryImageCommentsMap(id);
+            m[idx] = text;
+            saveState();
+        }
+        document.querySelectorAll('.diary-soul-comment-wrap[data-diary-id="' + id + '"][data-image-index="' + idx + '"]').forEach((root) => {
+            setSoulCommentBlockUI(root, id, imageIndex, phase, text);
+        });
+    }
+
+    function buildSoulCommentWrapHTML(diaryId, imageIndex) {
+        const id = escapeHtml(String(diaryId));
+        const idx = escapeHtml(String(imageIndex));
+        const boxClass = soulCommentBodyClass();
+        return (
+            '<div class="diary-soul-comment-wrap mt-1 w-full max-w-full" data-diary-id="' + id + '" data-image-index="' + idx + '">' +
+            '<button type="button" class="diary-soul-comment inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fffaf0]/80 border border-[#8d6e63]/40 text-[10px] text-[#5d4037] hover:border-[#d84315] transition-colors" ' +
+            'data-diary-id="' + id + '" data-image-index="' + idx + '">' +
+            '<i class="ph-fill ph-sparkle text-[10px]"></i><span>Soul 点评</span></button>' +
+            '<div class="' + boxClass + ' hidden" aria-live="polite"></div></div>'
+        );
+    }
+
+    function buildAigcBlockWithSoulHTML(diaryId, location, imageSrc) {
+        const safeLoc = escapeHtml(String(location || ''));
+        const safeSrc = String(imageSrc).replace(/"/g, '&quot;');
+        const id = escapeHtml(String(diaryId));
+        return (
+            '<div class="flex flex-col gap-2 w-full">' +
+            '<div class="relative group">' +
+            '<img src="' + safeSrc + '" alt="日记配图" class="w-full h-auto object-cover animate-[fadeIn_0.5s_ease-out]">' +
+            '<button type="button" class="js-export-diary-image absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-white text-[11px] hover:bg-black/80 transition-colors flex items-center gap-1" ' +
+            'data-diary-id="' + id + '" data-location="' + safeLoc + '" title="导出到本地">' +
+            '<i class="ph-fill ph-download-simple"></i><span>导出图片</span></button></div>' +
+            buildSoulCommentWrapHTML(diaryId, 0) +
+            '</div>'
+        );
+    }
+
+    function createDiaryImageSlotElement(diaryId, imageIndex, src) {
+        const wrap = document.createElement('div');
+        wrap.className = 'diary-image-slot flex flex-col gap-1 items-start max-w-[7rem]';
+        wrap.setAttribute('data-diary-id', String(diaryId));
+        wrap.setAttribute('data-image-index', String(imageIndex));
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '日记插图';
+        img.className = 'w-16 h-16 rounded-xl object-cover border border-white shadow-sm';
+        wrap.appendChild(img);
+        wrap.insertAdjacentHTML('beforeend', buildSoulCommentWrapHTML(diaryId, imageIndex));
+        return wrap;
+    }
+
+    function compressImageDataUrlForComment(dataUrl, maxLongEdge, quality) {
+        maxLongEdge = maxLongEdge || 1280;
+        quality = typeof quality === 'number' ? quality : 0.82;
+        return new Promise((resolve) => {
+            if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+                resolve(dataUrl);
+                return;
+            }
+            const img = new Image();
+            img.onload = () => {
+                const w = img.naturalWidth;
+                const h = img.naturalHeight;
+                if (!w || !h) {
+                    resolve(dataUrl);
+                    return;
+                }
+                const maxDim = Math.max(w, h);
+                if (maxDim <= maxLongEdge) {
+                    resolve(dataUrl);
+                    return;
+                }
+                const scale = maxLongEdge / maxDim;
+                const nw = Math.round(w * scale);
+                const nh = Math.round(h * scale);
+                const canvas = document.createElement('canvas');
+                canvas.width = nw;
+                canvas.height = nh;
+                const ctx = canvas.getContext('2d');
+                try {
+                    ctx.drawImage(img, 0, 0, nw, nh);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                } catch {
+                    resolve(dataUrl);
+                }
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        });
+    }
+
+    async function runSoulCommentForDiaryImage(diaryId, imageIndex) {
+        const id = String(diaryId);
+        const idx = parseInt(imageIndex, 10);
+        if (Number.isNaN(idx)) return;
+        const urls = (appState.diaryImages && appState.diaryImages[id]) ? appState.diaryImages[id] : [];
+        const src = urls[idx];
+        if (!src) {
+            updateSoulCommentAfterRequest(id, idx, 'error', '找不到这张图了，再插一次试试～');
+            return;
+        }
+
+        updateSoulCommentAfterRequest(id, idx, 'loading', '');
+
+        const personality = appState.petPersonality || '小火苗';
+        const pCfg = PERSONALITY_TYPES[personality] || {};
+        const payload = {
+            petPersonality: personality,
+            ownerTitle: typeof getOwnerTitle === 'function' ? getOwnerTitle() : '伙伴',
+            personalityPromptDesc: pCfg.promptDesc || '',
+            semanticProfileSnapshot: typeof getSemanticProfileSnapshotForDiary === 'function' ? getSemanticProfileSnapshotForDiary() : null,
+            location: getDiaryLocationForDiaryImage(id),
+            diaryTextSnippet: getDiaryTextSnippetForComment(id)
+        };
+
+        try {
+            const bodyPayload = { ...payload };
+            if (typeof src === 'string' && src.startsWith('https://')) {
+                bodyPayload.imageHttpUrl = src;
+            } else if (typeof src === 'string' && src.startsWith('data:')) {
+                bodyPayload.imageDataUrl = await compressImageDataUrlForComment(src);
+            } else {
+                const abs = new URL(src, window.location.href).href;
+                if (abs.startsWith('https://')) {
+                    bodyPayload.imageHttpUrl = abs;
+                } else {
+                    try {
+                        const r = await fetch(abs);
+                        const b = await r.blob();
+                        const d = await new Promise((resolve, reject) => {
+                            const fr = new FileReader();
+                            fr.onload = () => resolve(fr.result);
+                            fr.onerror = reject;
+                            fr.readAsDataURL(b);
+                        });
+                        bodyPayload.imageDataUrl = await compressImageDataUrlForComment(d);
+                    } catch {
+                        updateSoulCommentAfterRequest(id, idx, 'error', '这张图无法送去点评～');
+                        return;
+                    }
+                }
+            }
+
+            const res = await fetch(DIARY_SOUL_COMMENT_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyPayload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                let msg = (data && (data.message || data.error)) ? String(data.message || data.error) : '请求失败';
+                if (msg.length > 72) msg = '服务忙，稍后再试～';
+                updateSoulCommentAfterRequest(id, idx, 'error', msg);
+                return;
+            }
+            if (data && data.comment && String(data.comment).trim()) {
+                updateSoulCommentAfterRequest(id, idx, 'text', String(data.comment).trim());
+            } else {
+                updateSoulCommentAfterRequest(id, idx, 'error', '没有收到点评，稍后再试～');
+            }
+        } catch {
+            updateSoulCommentAfterRequest(id, idx, 'error', '网络开小差了～');
+        }
+    }
+
     function setupDiaryImageHandlers() {
         if (!diaryImageInput) return;
 
@@ -5833,6 +6123,16 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                     const diaryId = exportBtn.getAttribute('data-diary-id') || Date.now();
                     const filename = `soulgo-${loc}-${diaryId}.png`;
                     downloadImageToLocal(img.src, filename);
+                }
+                return;
+            }
+            const soulBtn = event.target.closest('.diary-soul-comment');
+            if (soulBtn) {
+                event.preventDefault();
+                const did = soulBtn.getAttribute('data-diary-id');
+                const iix = soulBtn.getAttribute('data-image-index');
+                if (did != null && iix != null) {
+                    runSoulCommentForDiaryImage(did, parseInt(iix, 10));
                 }
                 return;
             }
@@ -5858,15 +6158,23 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                 if (!appState.diaryImages) appState.diaryImages = {};
                 if (!appState.diaryImages[diaryId]) appState.diaryImages[diaryId] = [];
                 appState.diaryImages[diaryId].push(src);
+                const idx = appState.diaryImages[diaryId].length - 1;
+                const loc = getDiaryLocationForDiaryImage(diaryId);
 
-                const containers = document.querySelectorAll(`[data-diary-id="${diaryId}"] .diary-images`);
-                containers.forEach((container) => {
-                    const img = document.createElement('img');
-                    img.src = src;
-                    img.alt = '日记插图';
-                    img.className = 'w-16 h-16 rounded-xl object-cover border border-white shadow-sm';
-                    container.appendChild(img);
-                });
+                if (idx === 0) {
+                    const html = buildAigcBlockWithSoulHTML(diaryId, loc, src);
+                    document.querySelectorAll('.diary-aigc-image[data-diary-id="' + diaryId + '"]').forEach((el) => {
+                        el.classList.remove('hidden');
+                        el.innerHTML = html;
+                    });
+                    syncAllSoulCommentBlocksForSlot(diaryId, 0);
+                } else {
+                    const containers = document.querySelectorAll('[data-diary-id="' + diaryId + '"] .diary-images');
+                    containers.forEach((container) => {
+                        container.appendChild(createDiaryImageSlotElement(diaryId, idx, src));
+                    });
+                    syncAllSoulCommentBlocksForSlot(diaryId, idx);
+                }
                 saveState();
             };
             reader.readAsDataURL(file);
@@ -6381,18 +6689,9 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             if (!data.image_url) throw new Error('No image url returned');
 
             // 4. Update UI：图片 + 导出按钮（列表与弹窗同时更新）
-            const safeLoc = (location || '').replace(/"/g, '&quot;');
-            const successHTML = `
-                <div class="relative group">
-                    <img src="${data.image_url.replace(/"/g, '&quot;')}" alt="AIGC Generated" class="w-full h-auto object-cover animate-[fadeIn_0.5s_ease-out]">
-                    <button type="button" class="js-export-diary-image absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-white text-[11px] hover:bg-black/80 transition-colors flex items-center gap-1"
-                        data-diary-id="${diaryId}" data-location="${safeLoc}" title="导出到本地">
-                        <i class="ph-fill ph-download-simple"></i>
-                        <span>导出图片</span>
-                    </button>
-                </div>
-            `;
+            const successHTML = buildAigcBlockWithSoulHTML(diaryId, location, data.image_url);
             applyToAll(successHTML);
+            syncAllSoulCommentBlocksForSlot(diaryId, 0);
 
             // 持久化：一律写入 appState 并保存（含 data URL），与橱柜一致；QuotaExceeded 时由 saveState 内 strip 再重试
             if (!appState.diaryImages) appState.diaryImages = {};
@@ -8015,18 +8314,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
 
             const images = (appState.diaryImages && appState.diaryImages[diaryId]) ? appState.diaryImages[diaryId] : [];
             if (images.length > 0) {
-                const safeLoc = (location || '').replace(/"/g, '&quot;');
-                const firstUrl = (images[0] || '').replace(/"/g, '&quot;');
-                const aigcHTML = `
-                    <div class="relative group">
-                        <img src="${firstUrl}" alt="AIGC Generated" class="w-full h-auto object-cover animate-[fadeIn_0.5s_ease-out]">
-                        <button type="button" class="js-export-diary-image absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-white text-[11px] hover:bg-black/80 transition-colors flex items-center gap-1"
-                            data-diary-id="${escapeHtml(diaryId)}" data-location="${safeLoc}" title="导出到本地">
-                            <i class="ph-fill ph-download-simple"></i>
-                            <span>导出图片</span>
-                        </button>
-                    </div>
-                `;
+                const aigcHTML = buildAigcBlockWithSoulHTML(diaryId, location, images[0]);
                 const aigcContainers = document.querySelectorAll('.diary-aigc-image[data-diary-id="' + diaryId + '"]');
                 aigcContainers.forEach((el) => {
                     el.classList.remove('hidden');
@@ -8034,14 +8322,12 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                 });
                 const imgContainers = document.querySelectorAll('[data-diary-id="' + diaryId + '"] .diary-images');
                 for (let i = 1; i < images.length; i++) {
-                    const url = (images[i] || '').replace(/"/g, '&quot;');
                     imgContainers.forEach((container) => {
-                        const img = document.createElement('img');
-                        img.src = images[i];
-                        img.alt = '日记插图';
-                        img.className = 'w-16 h-16 rounded-xl object-cover border border-white shadow-sm';
-                        container.appendChild(img);
+                        container.appendChild(createDiaryImageSlotElement(diaryId, i, images[i]));
                     });
+                }
+                for (let j = 0; j < images.length; j++) {
+                    syncAllSoulCommentBlocksForSlot(diaryId, j);
                 }
             }
         });

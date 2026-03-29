@@ -32,6 +32,7 @@
    - 值：你的 OpenRouter API Key  
    - 环境：Production / Preview 按需勾选
    - （可选）生图功能：`OPENROUTER_IMAGE_MODEL`，不填则默认使用 `google/gemini-2.5-flash-image`。
+   - （可选）日记配图 Soul 点评（视觉）：`OPENROUTER_VISION_MODEL`，不填则与日记逻辑一致，默认 `google/gemini-2.0-flash-001`（见 `api/diary-image-comment.js`）。
 3. 保存后重新部署（或触发一次新部署）。
 4. 部署完成后访问 `https://你的项目.vercel.app`，打开 `prototype.html`（或配置为首页）即可使用；日记生成请求会由 Vercel Serverless 函数 `/api/chat` 代理并注入 Key，Key 不会暴露到前端。
 
@@ -40,6 +41,7 @@
 - `prototype.html` — 单页应用入口（打卡、日记、橱柜、宠物房间等）。
 - `api/chat.js` — Vercel Serverless 代理：接收前端 POST，从环境变量读取 `OPENROUTER_API_KEY`，转发到 OpenRouter 并返回响应。
 - `api/generate-image.js` — 生图接口：使用 `OPENROUTER_API_KEY` 与可选 `OPENROUTER_IMAGE_MODEL`，调用 OpenRouter 生成日记配图。
+- `api/diary-image-comment.js` — 日记上传图 / 配图的 Soul 风格多模态点评：可选 `OPENROUTER_VISION_MODEL`，否则使用 `OPENROUTER_DIARY_MODEL` / `OPENROUTER_MODEL_ID` / `google/gemini-2.0-flash-001`。
 - `.env.example` — 环境变量示例（不含真实 Key）；复制为 `.env.local` 并填入 Key 后用于本地开发。
 - `assets/`、`场景/` 等 — 静态资源。
 

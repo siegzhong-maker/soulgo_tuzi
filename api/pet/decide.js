@@ -4,6 +4,7 @@
  * Returns { intent, reason } with intent one of: go_to_bed_and_rest, check_cabinet, wait_at_door, play_with_user, walk_randomly.
  */
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const UPSTREAM_TIMEOUT_MS = 8000;
 
 const INTENT_WHITELIST = [
     'go_to_bed_and_rest',
@@ -93,6 +94,9 @@ export async function POST(request) {
         temperature: 0.3
     };
 
+    const upstreamController = new AbortController();
+    const upstreamTimer = setTimeout(() => upstreamController.abort(), UPSTREAM_TIMEOUT_MS);
+
     let upstream;
     try {
         upstream = await fetch(OPENROUTER_URL, {
@@ -102,14 +106,24 @@ export async function POST(request) {
                 'Authorization': `Bearer ${apiKey}`,
                 'X-Title': 'SoulGo Pet Decide'
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: upstreamController.signal
         });
     } catch (e) {
+        clearTimeout(upstreamTimer);
+        const name = e && e.name;
+        if (name === 'AbortError') {
+            return new Response(
+                JSON.stringify({ intent: null }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
         return new Response(
             JSON.stringify({ error: 'network_error', message: e.message || String(e) }),
             { status: 502, headers: { 'Content-Type': 'application/json' } }
         );
     }
+    clearTimeout(upstreamTimer);
 
     const raw = await upstream.text();
 

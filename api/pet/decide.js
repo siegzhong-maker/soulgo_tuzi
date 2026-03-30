@@ -3,6 +3,8 @@
  * Accepts POST { mood, health, currentState, lastUserAction?, recentBehaviors?, timestamp }
  * Returns { intent, reason } with intent one of: go_to_bed_and_rest, check_cabinet, wait_at_door, play_with_user, walk_randomly.
  */
+import { getSoulShortBlurb } from '../load-soul.js';
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const UPSTREAM_TIMEOUT_MS = 8000;
 
@@ -14,7 +16,9 @@ const INTENT_WHITELIST = [
     'walk_randomly'
 ];
 
-const SYSTEM_PROMPT = `你是宠物行为决策助手。根据当前宠物状态，从以下五种意图中选且仅选一个返回：
+const SYSTEM_PROMPT_BASE = `你是小粟的行为决策助手。小粟是美食森林系宠物：爱分享、珍惜食物、好奇味道；reason 用第一人称、简短口语，可带「～」。
+
+根据当前状态，从以下五种意图中选且仅选一个返回：
 - go_to_bed_and_rest：去床上休息（适合健康偏低、心情一般或疲劳时）
 - check_cabinet：去橱柜看看收藏（适合心情不错、想看看小物件时）
 - wait_at_door：到门口等待（适合期待出门、心情较好时）
@@ -22,6 +26,12 @@ const SYSTEM_PROMPT = `你是宠物行为决策助手。根据当前宠物状态
 - walk_randomly：在房间里随便走走（适合状态中性、轻度活动时）
 
 你必须只输出一行合法 JSON，格式为：{"intent":"<上述之一>","reason":"简短原因"}，不要其他文字、不要 markdown 代码块。`;
+
+function getPetDecideSystemPrompt() {
+  const blurb = getSoulShortBlurb(380);
+  if (!blurb) return SYSTEM_PROMPT_BASE;
+  return `${SYSTEM_PROMPT_BASE}\n\n【角色摘要】\n${blurb}`;
+}
 
 function buildUserPrompt(body) {
     const { mood, health, currentState, lastUserAction, recentBehaviors } = body || {};
@@ -87,7 +97,7 @@ export async function POST(request) {
     const payload = {
         model: 'google/gemini-2.0-flash-001',
         messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: getPetDecideSystemPrompt() },
             { role: 'user', content: userContent }
         ],
         max_tokens: 150,

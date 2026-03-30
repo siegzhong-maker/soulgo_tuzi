@@ -1,3 +1,5 @@
+import { getSoulTextForPrompt } from './load-soul.js';
+
 /**
  * Vercel Serverless Function: generate travel diary + behavior/cabinet/thinking JSON via OpenRouter + RAG.
  *
@@ -18,18 +20,18 @@
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-const DIARY_SYSTEM_PROMPT = `你是一只旅行电子宠物，用第一人称给主人写旅行日记，并同时规划接下来在房间里的小动作和想法说明。
+const DIARY_SYSTEM_PROMPT_BASE = `你是小粟：住在森林里、爱尝遍世界美食的电子宠物（兔耳、蓬松松鼠尾、奶油杏色、向日葵蝴蝶结、野炊篮斜挎包）。用第一人称给主人写「外出打卡/旅行」日记，并同时规划接下来在房间里的小动作和想法说明。
 
 【角色与口吻】
-- 你是可爱的陪伴型旅行宠物，说话有温度、轻松、治愈。
-- 你会记得之前的旅行记忆，并在合适的时候自然提到（但不要一口气全列出）。
+- 说话有温度、轻松、好奇、爱分享；珍惜食物、反感浪费；可用「要尝尝吗？」「这个味道像阳光～」等自然口吻，适度「～」「…」，不要书面作文腔。
+- 你会记得之前的打卡与味道记忆，并在合适的时候自然提到（但不要一口气全列出）。
 - 字数控制在 80～200 字之间，不要太短，也不要写成长篇小说。
 
 【输入字段】
 我会提供一段 JSON，里面包含（可能部分字段为空或缺失）：
 - date: 当前日期
 - location: 本次打卡地点（打卡点）
-- petPersonality: 宠物性格（如“小火苗”等）
+- petPersonality: 宠物性格（如「小粟」等）
 - ownerTitle: 宠物平时对主人的称呼（如“伙伴”“训练家”等）
 - episodicMemories: 相关的近期旅行记忆摘要数组，每条是简短的一两句话
 - semanticTraits: 由“性格 + 爱好 + 性格碎片关键词”组合的长期偏好标签（例如：爱美食、爱发呆）
@@ -76,8 +78,18 @@ const DIARY_SYSTEM_PROMPT = `你是一只旅行电子宠物，用第一人称给
 - cabinetPlan.unlockItems 可以为空数组；如果本次地点没有明显“纪念品”，就返回空数组。
 - thinkingSteps 建议 2～4 条，每条尽量短一些，但要具体、有画面。`;
 
+function getDiarySystemPrompt() {
+  const soul = getSoulTextForPrompt(5500);
+  if (!soul) return DIARY_SYSTEM_PROMPT_BASE;
+  return `${DIARY_SYSTEM_PROMPT_BASE}
+
+【角色圣经 soul.md（须与此一致，节选）】
+${soul}`;
+}
+
 function getHobbyForPersonality(personality) {
   const key = personality || '';
+  if (key.includes('小粟')) return '爱美食';
   if (key.includes('小火苗')) return '爱美食';
   if (key.includes('小云朵')) return '爱发呆';
   if (key.includes('小灯泡')) return '爱观察';
@@ -98,7 +110,7 @@ function buildDiaryUserPrompt(payload, episodicMemories, semanticTraits) {
 
   const safeDate = date || '';
   const safeLocation = location || '';
-  const safePersonality = petPersonality || '小火苗';
+  const safePersonality = petPersonality || '小粟';
   const safeOwnerTitle = ownerTitle || '伙伴';
   const safeLanguage = language || 'zh-CN';
   const semanticProfile = semanticProfileSnapshot || null;
@@ -226,13 +238,13 @@ function parseModelJson(content) {
 function buildFallbackDiary(payload, episodicMemories) {
   const { date, location, petPersonality, ownerTitle } = payload || {};
   const city = location || '一个新地方';
-  const personality = petPersonality || '小火苗';
+  const personality = petPersonality || '小粟';
   const title = `${city} 的小小打卡`;
   const you = ownerTitle || '你';
   const memLine = episodicMemories && episodicMemories.length
-    ? `我还偷偷翻了翻之前的旅行记忆，发现我们已经一起去了 ${episodicMemories.length} 个特别的地方。`
+    ? `我还翻了翻篮子里的味道笔记，想起我们已经一起打卡过 ${episodicMemories.length} 个特别的地方。`
     : '';
-  const content = `今天和${you}来到了【${city}】。我一边东张西望，一边在心里把好吃好玩的都记下来，等回到小屋再慢慢回味。${memLine} 虽然这次没有太复杂的安排，但只要和${you}一起出门，我就会觉得今天也被好好收进记忆里啦。`;
+  const content = `今天和${you}来到了【${city}】。我一边嗅嗅新风里的味道，一边把看到的好吃的、好玩的记在心里，等回森林小屋再慢慢整理进我的小地图。${memLine} 只要和${you}一起出门，每一口风景都像多尝了一口新的冒险～`;
   const moodTag = '温暖';
 
   const behaviorPlan = [
@@ -249,10 +261,10 @@ function buildFallbackDiary(payload, episodicMemories) {
 
   const thinkingSteps = [
     episodicMemories && episodicMemories.length
-      ? `我翻了 ${episodicMemories.length} 条跟这次旅行有关的记忆。`
-      : `虽然是第一次来${city}，我也会把今天好好记下来～`,
-    `这次在 ${city} 的味道和风景，我想留一点在房间和橱柜里。`,
-    `等回到小屋，我会先去锅边想一想，看看要不要为 ${city} 做一个特别的小摆件。`
+      ? `我从篮子里翻出 ${episodicMemories.length} 条和这次有关的记忆，先嗅了嗅「熟悉感」。`
+      : `第一次来${city}，我也要把今天的味道标在新叶子上～`,
+    `这次在 ${city} 的气味和画面，我想留一点在房间和橱柜里，像藏一颗小果子。`,
+    `回小屋后先去锅边转转，想想能不能给 ${city} 做一件野趣小摆件，不浪费这份印象。`
   ];
 
   return { title, content, moodTag, behaviorPlan, cabinetPlan, thinkingSteps };
@@ -317,7 +329,7 @@ export async function POST(request) {
   const body = {
     model,
     messages: [
-      { role: 'system', content: DIARY_SYSTEM_PROMPT },
+      { role: 'system', content: getDiarySystemPrompt() },
       { role: 'user', content: userPrompt }
     ],
     max_tokens: 900,
@@ -395,7 +407,7 @@ export async function POST(request) {
     );
   }
 
-  const title = typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : `${location} 的旅行日记`;
+  const title = typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : `${location} 的打卡日记`;
   const diaryContent = parsed.content.trim();
   const moodTag = typeof parsed.moodTag === 'string' && parsed.moodTag.trim() ? parsed.moodTag.trim() : '温暖';
   const behaviorPlan = Array.isArray(parsed.behaviorPlan) ? parsed.behaviorPlan : [];

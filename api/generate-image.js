@@ -57,7 +57,7 @@ export async function POST(request) {
     // 约束：不在图中生成任何文字，避免乱码
     const noTextInstruction = 'Important: The image must not contain any text, words, letters, signs, labels, captions, or writing. No text overlay. Pure visual scene only. ';
     const referenceInstruction = referenceImageUrlForModel
-        ? 'The attached reference image shows the exact mascot IP. Recreate the SAME character identity: same face shape, eyes, ears, body proportions, outfit, hat, collar, bag, camera prop, paw colors, and overall illustration style. Follow the user text for shot composition, body orientation, pose, activity, and time of day—vary these across images; avoid repeating the same framing and stiff front-facing tourist pose when the instructions call for something different. Change environment, pose, and lighting as directed; do not invent a different rabbit or generic mascot. '
+        ? 'The attached reference image shows the exact mascot IP (Xiao Su / 小粟). Recreate the SAME character identity: same face shape, eyes, long rabbit ears, fluffy squirrel tail, chibi round body, cream-apricot palette, sunflower bow on chest, crossbody picnic-basket bag, paw colors, and overall illustration style. Follow the user text for shot composition, body orientation, pose, activity, and time of day—vary these across images; avoid repeating the same framing and stiff front-facing tourist pose when the instructions call for something different. Change environment, pose, and lighting as directed; do not invent a different species or generic mascot. '
         : '';
     const finalPrompt = noTextInstruction + referenceInstruction + prompt;
 

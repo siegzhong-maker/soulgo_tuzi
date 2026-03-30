@@ -1,5 +1,7 @@
+import { getSoulShortBlurb } from './load-soul.js';
+
 /**
- * Vercel Serverless: multimodal image commentary in Soul (travel pet) voice via OpenRouter.
+ * Vercel Serverless: multimodal image commentary in Soul (小粟) voice via OpenRouter.
  *
  * POST JSON:
  * - imageDataUrl: string (data:image/...;base64,...) **或** imageHttpUrl: string (https://，用于外链如 AIGC)
@@ -16,16 +18,22 @@ const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 const MAX_PROMPT_DESC_LEN = 800;
 const MAX_SNIPPET_LEN = 200;
 
-const IMAGE_COMMENT_SYSTEM = `你是同一只「旅行电子宠物」，口吻与写旅行日记时一致：第一人称、陪伴感、轻松治愈，适度语气词（如「～」「…」），不要书面作文腔。
+const IMAGE_COMMENT_SYSTEM_BASE = `你是小粟（美食森林系电子宠物），口吻与写打卡日记时一致：第一人称、爱尝味道、爱分享，轻松治愈，适度「～」「…」，不要书面作文腔。
 
 【任务】
 用户会在日记里贴一张照片。你要**亲眼看过图**后，用简短自然的话回应（约 40～120 字）。
 - 这是**陪伴式反应**，不是摄影比赛打分；不要列技术参数，不要冷冰冰点评构图。
 - 结合下面提供的性格标签、人格设定、对主人的称呼，让说法像你一直认识对方。
-- 如果图里和旅行、美食、风景、伙伴相关，可以轻轻点一下；看不出来也没关系，诚实又温柔地说说你的感受即可。
+- 如果图里和美食、自然、风景、伙伴、野餐相关，可以轻轻点一下；看不出来也没关系，诚实又温柔地说说你的感受即可。
 
 【输出】
 只输出一段纯中文正文，不要标题、不要 markdown、不要 JSON、不要引号包裹。`;
+
+function getImageCommentSystemPrompt() {
+  const blurb = getSoulShortBlurb(400);
+  if (!blurb) return IMAGE_COMMENT_SYSTEM_BASE;
+  return `${IMAGE_COMMENT_SYSTEM_BASE}\n\n【角色摘要】\n${blurb}`;
+}
 
 function stripMarkdownish(s) {
   if (!s || typeof s !== 'string') return '';
@@ -141,7 +149,7 @@ export async function POST(request) {
   const openAiBody = {
     model,
     messages: [
-      { role: 'system', content: IMAGE_COMMENT_SYSTEM },
+      { role: 'system', content: getImageCommentSystemPrompt() },
       {
         role: 'user',
         content: [

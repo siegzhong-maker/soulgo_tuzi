@@ -742,8 +742,8 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            margin-bottom: 8px;
-            padding-bottom: 6px;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
             border-bottom: 1px dashed rgba(232, 196, 168, 0.85);
         }
         .memory-modal-content .soul-paper-card__title {
@@ -766,50 +766,58 @@
         }
         .memory-modal-content .soul-dossier-hero-stack {
             display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            gap: 10px;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
         }
         .memory-modal-content .soul-dossier-figure {
             margin: 0;
-            width: 100%;
+            flex-shrink: 0;
+            width: auto;
+            max-width: 42%;
             display: flex;
             justify-content: center;
             align-items: center;
-            border-radius: 12px;
-            background: linear-gradient(180deg, rgba(255, 253, 248, 0.9) 0%, rgba(248, 237, 216, 0.5) 100%);
-            padding: 6px 4px 2px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255, 253, 248, 0.9) 0%, rgba(248, 237, 216, 0.45) 100%);
+            padding: 4px 2px;
         }
         .memory-modal-content .soul-dossier-figure img {
-            max-height: 210px;
+            max-height: 112px;
             width: auto;
             max-width: 100%;
             object-fit: contain;
-            filter: drop-shadow(0 4px 10px rgba(61, 52, 40, 0.14));
+            filter: drop-shadow(0 3px 8px rgba(61, 52, 40, 0.12));
         }
         .memory-modal-content .soul-dossier-text-block {
-            text-align: center;
-            padding: 0 4px 4px;
+            text-align: left;
+            padding: 0 2px 0 0;
+            flex: 1;
+            min-width: 0;
         }
         .memory-modal-content .soul-dossier-name {
-            font-size: 17px;
+            font-size: 15px;
             font-weight: 800;
             color: var(--soul-ink);
-            letter-spacing: 0.04em;
-            margin: 0 0 4px 0;
+            letter-spacing: 0.03em;
+            margin: 0 0 2px 0;
         }
         .memory-modal-content .soul-dossier-tagline {
-            font-size: 11px;
-            line-height: 1.5;
+            font-size: 10px;
+            line-height: 1.45;
             color: var(--soul-muted);
             margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
         .memory-modal-content .soul-dossier-chips {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
-            justify-content: center;
-            margin-top: 8px;
+            gap: 4px;
+            justify-content: flex-start;
+            margin-top: 6px;
         }
         .memory-modal-content .soul-dossier-chip {
             display: inline-flex;
@@ -824,7 +832,7 @@
             box-shadow: 0 1px 2px rgba(61, 52, 40, 0.06);
         }
         .memory-modal-content .soul-dossier-details {
-            margin-top: 8px;
+            margin-top: 6px;
             border-radius: 12px;
             border: 1px dashed rgba(232, 196, 168, 0.9);
             background: rgba(255, 253, 248, 0.65);
@@ -848,9 +856,13 @@
             padding-bottom: 6px;
         }
         .memory-modal-content .soul-dossier-details-inner {
-            max-height: min(55vh, 320px);
+            max-height: min(50dvh, 280px);
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+        #memory-main-tab-travel-panel.memory-scroll-panel {
+            overscroll-behavior-y: contain;
         }
         .memory-modal-content .soul-section-card {
             margin-top: 10px;
@@ -7773,8 +7785,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         let shell = document.getElementById('memory-main-shell');
         if (!shell) {
             const shellHTML = `
-                <div id="memory-main-shell" class="flex flex-col gap-0 text-xs memory-modal-content h-full">
-                    <div id="memory-main-tab-travel-panel" class="overflow-y-auto flex-1 min-h-0"></div>
+                <div id="memory-main-shell" class="flex flex-col gap-0 text-xs memory-modal-content h-full min-h-0">
+                    <div id="memory-main-tab-travel-panel" class="memory-scroll-panel flex flex-col flex-1 min-h-0 overflow-y-auto"></div>
                 </div>
             `;
             modalBody.innerHTML = shellHTML;
@@ -7782,6 +7794,9 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         }
 
         const travelPanel = document.getElementById('memory-main-tab-travel-panel');
+        if (travelPanel) {
+            travelPanel.className = 'memory-scroll-panel flex flex-col flex-1 min-h-0 overflow-y-auto';
+        }
 
         const travelList = getEpisodicTravel();
         const dailyList = getEpisodicDaily();
@@ -7795,7 +7810,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const countText = countForInnerTab + ' 条记录';
 
         const tabBarHTML = `
-            <div class="flex items-center justify-between border-b border-gray-100 pb-1 mb-2">
+            <div class="flex items-center justify-between border-b border-gray-100 pb-1 mb-1">
                 <div class="flex items-center gap-2">
                     <div class="flex gap-3">
                         <button type="button" id="memory-tab-travel" class="memory-tab text-[11px] font-semibold px-1 pb-1 border-b transition-colors ${currentMemoryTab === 'travel' ? 'text-teal-700 border-teal-600' : 'text-gray-400 border-transparent'}">旅行记忆</button>
@@ -7825,15 +7840,31 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const overviewPills = currentMemoryTab === 'travel'
             ? (episodicTotal > 0 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100 text-[10px]">旅行 ${travelTotal} · 日常 ${dailyTotal}</span>` : '')
             : (habitTotal + recentInteractionTotal > 0 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px]">小习惯 ${habitTotal} · 互动 ${recentInteractionTotal}</span>` : '');
-        const overviewHTML = `
-            <div class="mb-2">
-                <div class="flex items-center justify-between gap-2 text-[11px]">
-                    <span class="font-semibold text-gray-700">${travelTotal ? `累计旅行 ${travelTotal} 次` : '还没有旅行记忆'}</span>
-                    ${latestLabel ? `<span class="text-[10px] text-gray-400 shrink-0">${escapeHtml(latestLabel)}</span>` : ''}
-                </div>
-                ${overviewPills ? '<div class="mt-1">' + overviewPills + '</div>' : ''}
-            </div>
-        `;
+        let overviewHTML;
+        if (currentMemoryTab === 'character') {
+            const compactLatest = latestLabel ? latestLabel.replace(/^最近：/, '') : '';
+            const parts = [
+                '<span class="font-semibold text-gray-700 text-[10px]">' + (travelTotal ? '旅行 ' + travelTotal + ' 次' : '暂无旅行') + '</span>'
+            ];
+            if (compactLatest) {
+                parts.push('<span class="text-gray-400 text-[10px] shrink-0">' + escapeHtml(compactLatest) + '</span>');
+            }
+            if (overviewPills) {
+                parts.push('<span class="inline-flex flex-wrap items-center gap-1">' + overviewPills + '</span>');
+            }
+            overviewHTML = '<div class="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">' + parts.join('') + '</div>';
+        } else {
+            overviewHTML =
+                '<div class="mb-2">' +
+                '<div class="flex items-center justify-between gap-2 text-[11px]">' +
+                '<span class="font-semibold text-gray-700">' +
+                (travelTotal ? '累计旅行 ' + travelTotal + ' 次' : '还没有旅行记忆') +
+                '</span>' +
+                (latestLabel ? '<span class="text-[10px] text-gray-400 shrink-0">' + escapeHtml(latestLabel) + '</span>' : '') +
+                '</div>' +
+                (overviewPills ? '<div class="mt-1">' + overviewPills + '</div>' : '') +
+                '</div>';
+        }
 
         function getTimeWindow(m) {
             if (m.time_window) return m.time_window;
@@ -7993,7 +8024,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     .join('');
             }
             const idClean = (profile.identity || '').replace(/\s+/g, ' ').trim();
-            const tagline = idClean ? truncateText(idClean, 44) : '森林里的美食探险家';
+            const tagline = idClean ? truncateText(idClean, 36) : '森林里的美食探险家';
             const chipList = [];
             const prefs = profile.preferences || {};
             const firstChunk = function (t) {
@@ -8016,8 +8047,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 .join('');
             return (
                 '<div class="soul-dossier-root mb-1">' +
-                '<div class="soul-paper-card soul-paper-card--hero p-3 mb-2 relative cursor-pointer" data-memory-type="semanticProfile">' +
-                '<button type="button" class="memory-edit-btn absolute top-2 right-2 z-[1] text-[10px] text-[#7c5c3b] hover:text-[#b45309] px-1.5 py-0.5 rounded bg-white/70 border border-[#e8c4a8]/60">编辑</button>' +
+                '<div class="soul-paper-card soul-paper-card--hero p-2 mb-1 relative cursor-pointer" data-memory-type="semanticProfile">' +
+                '<button type="button" class="memory-edit-btn absolute top-1.5 right-1.5 z-[1] text-[10px] text-[#7c5c3b] hover:text-[#b45309] px-1.5 py-0.5 rounded bg-white/70 border border-[#e8c4a8]/60">编辑</button>' +
                 '<div class="soul-paper-card__head">' +
                 '<div class="soul-paper-card__title"><i class="ph-fill ph-note-pencil text-[#c9a227] text-base"></i>核心档案</div>' +
                 '<div class="soul-paper-card__dots" aria-hidden="true"><span></span><span></span><span></span></div>' +
@@ -8034,7 +8065,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 '<div class="soul-dossier-chips">' +
                 chipsHTML +
                 '</div>' +
-                '<p class="text-[9px] mt-2 soul-fetch-hint">点「编辑」可改本机补充设定</p>' +
+                '<p class="text-[8px] mt-1 soul-fetch-hint leading-snug">点「编辑」可改本机设定</p>' +
                 '</div></div></div>' +
                 '<details class="soul-dossier-details">' +
                 '<summary>展开完整档案（soul）</summary>' +
@@ -8075,7 +8106,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 observe: '待在原地看你'
             };
             interactionVisualHTML =
-                '<div class="memory-card bg-white rounded-xl p-3 shadow-md border border-gray-100 text-left mb-2">' +
+                '<div class="memory-card bg-white rounded-xl p-2.5 shadow-md border border-gray-100 text-left mb-1.5">' +
                 '<div class="text-[10px] text-gray-400 mb-1">最近的小习惯趋势</div>' +
                 top.map((item) => {
                     const widthPct = Math.max(10, Math.round((item.count / maxCount) * 100));
@@ -8104,7 +8135,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             }()) : '';
             const labelPrefix = isInteraction ? '' : '经常… ';
             return (
-                '<button type="button" class="habit-summary-card rounded-lg border bg-white p-2.5 shadow-sm flex flex-col items-start text-left relative hover:bg-teal-50/60 transition cursor-pointer" data-memory-type="habit" data-habit-index="' + idx + '">' +
+                '<button type="button" class="habit-summary-card rounded-lg border bg-white p-2 shadow-sm flex flex-col items-start text-left relative hover:bg-teal-50/60 transition cursor-pointer" data-memory-type="habit" data-habit-index="' + idx + '">' +
                 '<div class="flex items-center gap-1 mb-1 text-[11px] text-gray-700">' +
                 '<i class="ph-fill ph-footprints text-amber-500 text-xs"></i>' +
                 '<span class="font-medium">' + escapeHtml(truncateText(labelPrefix + summary, 14)) + '</span>' +
@@ -8115,7 +8146,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         }
 
         const habitCardsHTML = (currentMemoryTab === 'character' && habits.length > 0)
-            ? '<div class="mt-2"><div class="flex items-center justify-between mb-1"><div class="flex items-center gap-1 text-[11px] font-semibold text-gray-500"><i class="ph-fill ph-footprints text-amber-500 text-xs"></i><span>小习惯碎片</span></div><span class="text-[10px] text-gray-400">共 ' + habits.length + ' 条</span></div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">' +
+            ? '<div class="mt-1.5"><div class="flex items-center justify-between mb-0.5"><div class="flex items-center gap-1 text-[10px] font-semibold text-gray-500"><i class="ph-fill ph-footprints text-amber-500 text-xs"></i><span>小习惯碎片</span></div><span class="text-[9px] text-gray-400">共 ' + habits.length + ' 条</span></div><div class="grid grid-cols-2 md:grid-cols-3 gap-1.5">' +
                 habits.map((h, idx) => buildHabitSummaryCard(h, idx)).join('') +
                 '</div></div>'
             : '';
@@ -8134,14 +8165,23 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             const hasContent = moodText || healthText;
             if (hasContent) {
                 moodHealthHTML =
-                    '<div class="mt-2 pt-1 border-t border-gray-100 text-[10px] text-gray-500 flex items-center justify-between gap-2">' +
+                    '<div class="mt-1.5 pt-1 border-t border-gray-100 text-[10px] text-gray-500 flex items-center justify-between gap-2">' +
                     '<span>这阵子整体心情：' + escapeHtml(moodText || '——') + ' · 体力：' + escapeHtml(healthText || '——') + '</span>' +
                     '<span class="text-[9px] text-gray-400">基于最近互动感知</span>' +
                     '</div>';
             }
         }
 
-        const innerBodyHTML = '<div class="flex flex-col gap-0 text-xs memory-modal-content">' + tabBarHTML + overviewHTML + '<div id="memory-tab-content" class="overflow-y-auto flex-1 min-h-0">' + travelPanelHTML + characterPanelHTML + '</div>' + moodHealthHTML + '</div>';
+        const innerBodyHTML =
+            '<div class="flex flex-col flex-1 min-h-0 gap-0 text-xs memory-modal-content">' +
+            tabBarHTML +
+            overviewHTML +
+            '<div id="memory-tab-content" class="overflow-visible">' +
+            travelPanelHTML +
+            characterPanelHTML +
+            '</div>' +
+            moodHealthHTML +
+            '</div>';
 
         if (travelPanel) {
             travelPanel.innerHTML = innerBodyHTML;

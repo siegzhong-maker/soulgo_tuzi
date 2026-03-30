@@ -6297,7 +6297,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     }
 
     function soulCommentBodyClass() {
-        return 'diary-soul-comment-body mt-1 w-full max-w-full min-w-0 break-words rounded-lg bg-[#fffaf0]/90 border border-[#8d6e63]/20 px-2 py-1.5 text-[11px] leading-snug text-[#5d4037]';
+        return 'diary-soul-comment-body mt-1 w-full max-w-full min-w-0 flex-1 min-h-0 overflow-y-auto break-words rounded-lg bg-[#fffaf0]/90 border border-[#8d6e63]/20 px-2 py-1.5 text-[11px] leading-snug text-[#5d4037]';
     }
 
     function setSoulCommentBlockUI(rootEl, diaryId, imageIndex, phase, text) {
@@ -6362,8 +6362,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const idx = escapeHtml(String(imageIndex));
         const boxClass = soulCommentBodyClass();
         return (
-            '<div class="diary-soul-comment-wrap mt-0 w-full max-w-full min-w-0" data-diary-id="' + id + '" data-image-index="' + idx + '">' +
-            '<button type="button" class="diary-soul-comment inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fffaf0]/80 border border-[#8d6e63]/40 text-[10px] text-[#5d4037] hover:border-[#d84315] transition-colors" ' +
+            '<div class="diary-soul-comment-wrap mt-0 w-full max-w-full min-w-0 h-full flex flex-col min-h-0" data-diary-id="' + id + '" data-image-index="' + idx + '">' +
+            '<button type="button" class="diary-soul-comment flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fffaf0]/80 border border-[#8d6e63]/40 text-[10px] text-[#5d4037] hover:border-[#d84315] transition-colors" ' +
             'data-diary-id="' + id + '" data-image-index="' + idx + '">' +
             '<i class="ph-fill ph-sparkle text-[10px]"></i><span>Soul 点评</span></button>' +
             '<div class="' + boxClass + ' hidden" aria-live="polite"></div></div>'
@@ -6390,13 +6390,13 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const soulBlock = buildSoulCommentWrapHTML(diaryId, 0);
         return (
             '<div class="flex flex-col gap-2 w-full">' +
-            '<div class="flex max-sm:flex-col flex-row max-sm:gap-2 gap-3 items-start w-full min-w-0">' +
-            '<div class="relative group w-full sm:w-40 flex-shrink-0">' +
-            '<img src="' + safeSrc + '" alt="日记配图" class="w-full aspect-square rounded-xl object-cover border border-white shadow-sm animate-[fadeIn_0.5s_ease-out]">' +
+            '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch w-full min-w-0">' +
+            '<div class="relative group aspect-square w-full overflow-hidden rounded-xl border border-white shadow-sm">' +
+            '<img src="' + safeSrc + '" alt="日记配图" class="w-full h-full object-cover animate-[fadeIn_0.5s_ease-out]">' +
             '<button type="button" class="js-export-diary-image absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-white text-[11px] hover:bg-black/80 transition-colors flex items-center gap-1" ' +
             'data-diary-id="' + id + '" data-location="' + safeLoc + '" title="导出到本地">' +
             '<i class="ph-fill ph-download-simple"></i><span>导出图片</span></button></div>' +
-            '<div class="flex-1 min-w-0 basis-0">' + soulBlock + '</div>' +
+            '<div class="flex flex-col min-h-0 aspect-square w-full">' + soulBlock + '</div>' +
             '</div>' +
             '</div>'
         );
@@ -6404,17 +6404,20 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
     function createDiaryImageSlotElement(diaryId, imageIndex, src) {
         const wrap = document.createElement('div');
-        wrap.className = 'diary-image-slot col-span-full w-full min-w-0 flex max-sm:flex-col flex-row max-sm:gap-2 gap-3 items-start';
+        wrap.className = 'diary-image-slot col-span-full w-full min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch';
         wrap.setAttribute('data-diary-id', String(diaryId));
         wrap.setAttribute('data-image-index', String(imageIndex));
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'relative group aspect-square w-full overflow-hidden rounded-xl border border-white shadow-sm';
         const img = document.createElement('img');
         img.src = src;
         img.alt = '日记插图';
-        img.className = 'w-full sm:w-40 flex-shrink-0 aspect-square rounded-xl object-cover border border-white shadow-sm';
+        img.className = 'w-full h-full object-cover';
+        imgWrap.appendChild(img);
         const soulCol = document.createElement('div');
-        soulCol.className = 'flex-1 min-w-0 basis-0';
+        soulCol.className = 'flex flex-col min-h-0 aspect-square w-full';
         soulCol.insertAdjacentHTML('beforeend', buildSoulCommentWrapHTML(diaryId, imageIndex));
-        wrap.appendChild(img);
+        wrap.appendChild(imgWrap);
         wrap.appendChild(soulCol);
         return wrap;
     }

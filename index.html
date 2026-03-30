@@ -764,45 +764,93 @@
             margin-left: 3px;
             opacity: 0.65;
         }
-        .memory-modal-content .soul-dossier-grid {
-            display: grid;
-            grid-template-columns: 1fr minmax(88px, 34%);
+        .memory-modal-content .soul-dossier-hero-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
             gap: 10px;
-            align-items: start;
-        }
-        @media (max-width: 380px) {
-            .memory-modal-content .soul-dossier-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .memory-modal-content .soul-dossier-dl {
-            font-size: 11px;
-            line-height: 1.55;
-            color: var(--soul-ink);
-        }
-        .memory-modal-content .soul-dossier-dl dt {
-            font-weight: 700;
-            color: var(--soul-muted);
-            font-size: 10px;
-            margin-top: 6px;
-        }
-        .memory-modal-content .soul-dossier-dl dt:first-child {
-            margin-top: 0;
-        }
-        .memory-modal-content .soul-dossier-dl dd {
-            margin: 2px 0 0 0;
         }
         .memory-modal-content .soul-dossier-figure {
             margin: 0;
-            align-self: end;
-            justify-self: center;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(255, 253, 248, 0.9) 0%, rgba(248, 237, 216, 0.5) 100%);
+            padding: 6px 4px 2px;
         }
         .memory-modal-content .soul-dossier-figure img {
-            max-height: 140px;
+            max-height: 210px;
             width: auto;
             max-width: 100%;
             object-fit: contain;
-            filter: drop-shadow(0 3px 6px rgba(61, 52, 40, 0.15));
+            filter: drop-shadow(0 4px 10px rgba(61, 52, 40, 0.14));
+        }
+        .memory-modal-content .soul-dossier-text-block {
+            text-align: center;
+            padding: 0 4px 4px;
+        }
+        .memory-modal-content .soul-dossier-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--soul-ink);
+            letter-spacing: 0.04em;
+            margin: 0 0 4px 0;
+        }
+        .memory-modal-content .soul-dossier-tagline {
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--soul-muted);
+            margin: 0;
+        }
+        .memory-modal-content .soul-dossier-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .memory-modal-content .soul-dossier-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b4f2e;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(232, 196, 168, 0.95);
+            box-shadow: 0 1px 2px rgba(61, 52, 40, 0.06);
+        }
+        .memory-modal-content .soul-dossier-details {
+            margin-top: 8px;
+            border-radius: 12px;
+            border: 1px dashed rgba(232, 196, 168, 0.9);
+            background: rgba(255, 253, 248, 0.65);
+            padding: 6px 10px 10px;
+        }
+        .memory-modal-content .soul-dossier-details > summary {
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--soul-muted);
+            list-style: none;
+            padding: 4px 0;
+            user-select: none;
+        }
+        .memory-modal-content .soul-dossier-details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .memory-modal-content .soul-dossier-details[open] > summary {
+            margin-bottom: 6px;
+            border-bottom: 1px dashed rgba(232, 196, 168, 0.6);
+            padding-bottom: 6px;
+        }
+        .memory-modal-content .soul-dossier-details-inner {
+            max-height: min(55vh, 320px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .memory-modal-content .soul-section-card {
             margin-top: 10px;
@@ -7920,52 +7968,52 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             return str.slice(0, maxLength) + '…';
         }
 
-        function createPreferenceTags(profile) {
-            if (!profile || !profile.preferences) return '';
-            const prefs = profile.preferences || {};
-            const tags = [];
-            if (prefs.food) tags.push(prefs.food);
-            if (prefs.dislikes) tags.push(prefs.dislikes);
-            if (prefs.abilities) tags.push(prefs.abilities);
-            if (!tags.length) return '';
-            const sliced = tags.slice(0, 3);
-            return sliced.map((t) =>
-                '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100 text-[10px] mr-1 mb-1">' +
-                escapeHtml(truncateText(t, 10)) +
-                '</span>'
-            ).join('');
-        }
-
         function buildSoulDossierBlock(profile) {
             if (!profile) return '';
-            const prefsTagsHTML = createPreferenceTags(profile)
-                .replace(/bg-teal-50/g, 'bg-amber-50/90')
-                .replace(/text-teal-700/g, 'text-amber-900/90')
-                .replace(/border-teal-100/g, 'border-amber-200/80');
             const md = typeof soulMarkdownCache === 'string' ? soulMarkdownCache : '';
             const sections = md.length > 30 ? parseSoulMarkdownSections(md).filter((s) => s.title !== '基础信息') : [];
-            let sectionsHTML = '';
+            let sectionsInnerHTML = '';
             if (md.length < 30) {
-                sectionsHTML = '<p class="soul-fetch-hint text-center px-2 py-3">正在加载档案正文（soul.md）…</p>';
+                sectionsInnerHTML = '<p class="soul-fetch-hint text-center px-1 py-2">展开后加载 soul.md 正文…</p>';
             } else if (sections.length === 0) {
-                sectionsHTML = '<p class="soul-fetch-hint text-center px-2 py-3">未解析到档案章节。</p>';
+                sectionsInnerHTML = '<p class="soul-fetch-hint text-center px-1 py-2">未解析到档案章节。</p>';
             } else {
-                sectionsHTML = sections
-                    .map(
-                        (s) =>
-                            '<div class="soul-paper-card soul-section-card">' +
+                sectionsInnerHTML = sections
+                    .map((s) => {
+                        return (
+                            '<div class="soul-paper-card soul-section-card mb-2">' +
                             '<h3>' +
                             escapeHtml(s.title) +
                             '</h3>' +
                             '<div class="soul-section-body">' +
-                            escapeHtml(s.body) +
+                            escapeHtml(s.body || '') +
                             '</div></div>'
-                    )
+                        );
+                    })
                     .join('');
             }
-            const identityLine = profile.identity
-                ? '<p class="text-[11px] mt-2 leading-relaxed" style="color:#5c4a3a">' + escapeHtml(profile.identity) + '</p>'
-                : '';
+            const idClean = (profile.identity || '').replace(/\s+/g, ' ').trim();
+            const tagline = idClean ? truncateText(idClean, 44) : '森林里的美食探险家';
+            const chipList = [];
+            const prefs = profile.preferences || {};
+            const firstChunk = function (t) {
+                if (!t) return '';
+                const s0 = String(t).trim();
+                const a = s0.split(/[，,。；;]/);
+                return truncateText((a[0] || s0).replace(/\s+/g, ''), 6);
+            };
+            const c1 = firstChunk(prefs.food);
+            const c2 = firstChunk(prefs.abilities);
+            if (c1) chipList.push(c1);
+            if (c2 && c2 !== c1) chipList.push(c2);
+            const fallbackChips = ['森林', '美食', '爱分享'];
+            fallbackChips.forEach((fc) => {
+                if (chipList.length < 3 && chipList.indexOf(fc) < 0) chipList.push(fc);
+            });
+            const chipsHTML = chipList
+                .slice(0, 3)
+                .map((c) => '<span class="soul-dossier-chip">' + escapeHtml(c) + '</span>')
+                .join('');
             return (
                 '<div class="soul-dossier-root mb-1">' +
                 '<div class="soul-paper-card soul-paper-card--hero p-3 mb-2 relative cursor-pointer" data-memory-type="semanticProfile">' +
@@ -7974,23 +8022,25 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 '<div class="soul-paper-card__title"><i class="ph-fill ph-note-pencil text-[#c9a227] text-base"></i>核心档案</div>' +
                 '<div class="soul-paper-card__dots" aria-hidden="true"><span></span><span></span><span></span></div>' +
                 '</div>' +
-                '<div class="soul-dossier-grid">' +
-                '<dl class="soul-dossier-dl">' +
-                '<dt>名称</dt><dd>小粟</dd>' +
-                '<dt>头身比</dt><dd>约 1 : 1.2，头部较大，幼态</dd>' +
-                '<dt>形象</dt><dd>兔子长耳朵 + 松鼠蓬松尾巴 + 小不点圆润身形</dd>' +
-                '<dt>主色系</dt><dd>奶油杏色</dd>' +
-                '<dt>标志性配饰</dt><dd>胸前向日葵蝴蝶结；斜挎野炊篮（装食材与分享）</dd>' +
-                '<dt>设定</dt><dd>尝遍世界美食，住森林，偏爱天然食材</dd>' +
-                '</dl>' +
+                '<div class="soul-dossier-hero-stack">' +
                 '<figure class="soul-dossier-figure">' +
-                '<img src="assets/xiaosu-dossier.png" alt="小粟" loading="lazy" />' +
-                '</figure></div>' +
-                identityLine +
-                (prefsTagsHTML ? '<div class="mt-2 flex flex-wrap -mb-1">' + prefsTagsHTML + '</div>' : '') +
-                '<p class="text-[9px] mt-2 leading-snug soul-fetch-hint">卡片内为固定基础信息；完整长文来自 soul.md。点「编辑」可改本机补充设定（身份 / 喜好 / 称呼等）。</p>' +
+                '<img src="assets/xiaosu-hero.png" alt="小粟" loading="lazy" />' +
+                '</figure>' +
+                '<div class="soul-dossier-text-block">' +
+                '<p class="soul-dossier-name">小粟</p>' +
+                '<p class="soul-dossier-tagline">' +
+                escapeHtml(tagline) +
+                '</p>' +
+                '<div class="soul-dossier-chips">' +
+                chipsHTML +
                 '</div>' +
-                sectionsHTML +
+                '<p class="text-[9px] mt-2 soul-fetch-hint">点「编辑」可改本机补充设定</p>' +
+                '</div></div></div>' +
+                '<details class="soul-dossier-details">' +
+                '<summary>展开完整档案（soul）</summary>' +
+                '<div class="soul-dossier-details-inner">' +
+                sectionsInnerHTML +
+                '</div></details>' +
                 '</div>'
             );
         }

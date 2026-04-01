@@ -885,7 +885,20 @@
         .memory-modal-content .soul-dossier-identity-details[open] .soul-dossier-identity-label-open {
             display: inline;
         }
+        /* 展开后正文在上、横条在下，与折叠时「预览 + 底部横条」同一位置，避免收起按钮跑到顶部 */
+        .memory-modal-content .soul-dossier-identity-details[open] {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .memory-modal-content .soul-dossier-identity-details[open] .soul-dossier-identity-full {
+            order: 1;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
         .memory-modal-content .soul-dossier-identity-details[open] > summary {
+            order: 2;
+            flex-shrink: 0;
             margin-bottom: 0;
         }
         .memory-modal-content .soul-dossier-identity-full {
@@ -902,7 +915,6 @@
             border-radius: 0;
             background: rgba(255, 253, 248, 0.95);
             border: none;
-            border-top: 1px dashed rgba(232, 196, 168, 0.5);
         }
         .memory-modal-content .soul-dossier-chips {
             display: flex;

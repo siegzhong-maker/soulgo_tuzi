@@ -87,13 +87,17 @@ function getDiarySystemPrompt() {
 ${soul}`;
 }
 
+const PERSONALITY_HOBBY_MAP = [
+  { keys: ['小粟', '小火苗'], semanticTrait: '爱美食', hobbyLabel: '美食与味道' },
+  { keys: ['小云朵'], semanticTrait: '爱发呆', hobbyLabel: '花草与自然' },
+  { keys: ['小灯泡'], semanticTrait: '爱观察', hobbyLabel: '城市与地标' },
+  { keys: ['小石头'], semanticTrait: '爱安静', hobbyLabel: '纪念与足迹' }
+];
+
 function getHobbyForPersonality(personality) {
-  const key = personality || '';
-  if (key.includes('小粟')) return '爱美食';
-  if (key.includes('小火苗')) return '爱美食';
-  if (key.includes('小云朵')) return '爱发呆';
-  if (key.includes('小灯泡')) return '爱观察';
-  if (key.includes('小石头')) return '爱安静';
+  const key = String(personality || '');
+  const matched = PERSONALITY_HOBBY_MAP.find((entry) => entry.keys.some((k) => key.includes(k)));
+  if (matched) return matched.semanticTrait;
   return '爱美食';
 }
 

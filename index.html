@@ -575,10 +575,10 @@
             top: calc(100% + 4px);
             left: 0;
             right: 0;
-            background: #4b4b4b;
-            border: 1px solid rgba(0, 0, 0, 0.4);
+            background: #fff7ef;
+            border: 1px solid #e6d6c0;
             border-radius: 0.7rem;
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+            box-shadow: 0 10px 24px rgba(120, 90, 70, 0.2);
             max-height: 180px;
             overflow-y: auto;
             z-index: 45;
@@ -592,7 +592,7 @@
             width: 100%;
             border: 0;
             background: transparent;
-            color: #f5f5f5;
+            color: #6b5c4d;
             font-size: 10px;
             font-weight: 700;
             padding: 0.4rem 0.6rem;
@@ -600,11 +600,11 @@
             display: block;
         }
         .cabinet-modal .cabinet-custom-select__option.is-selected {
-            background: rgba(73, 151, 255, 0.92);
+            background: #ff8fab;
             color: #ffffff;
         }
         .cabinet-modal .cabinet-custom-select__option:not(.is-selected):hover {
-            background: rgba(255, 255, 255, 0.14);
+            background: #fff0f4;
         }
         .cabinet-modal .cabinet-matrix-reset-btn {
             min-height: 34px;
@@ -5988,7 +5988,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         let head = `<tr><th class="collect-matrix-corner rounded-tl-lg" scope="col"><span class="collect-matrix-corner-label"><span class="collect-matrix-corner-line">纵｜品类</span><span class="collect-matrix-corner-line">横｜稀有度</span></span></th>`;
         tiers.forEach((tier) => {
             const tc = TIER_CONFIG[tier] || TIER_CONFIG.C;
-            head += `<th class="rounded-t-lg p-0" scope="col"><span class="collect-matrix-tier-head ${tc.class}"><span class="collect-matrix-tier-head__row"><i class="ph-fill ${tc.icon} text-[9px]" aria-hidden="true"></i><span class="text-[10px] font-extrabold">${tier}</span></span><span class="collect-matrix-tier-head__label">${tc.label}</span></span></th>`;
+            head += `<th class="rounded-t-lg p-0" scope="col"><span class="collect-matrix-tier-head ${tc.class}"><span class="collect-matrix-tier-head__row"><span class="text-[10px] font-extrabold">${tier}</span></span><span class="collect-matrix-tier-head__label">${tc.label}</span></span></th>`;
         });
         head += '</tr>';
         let body = '';
@@ -6002,7 +6002,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             });
             body += '</tr>';
         });
-        return `<div class="collect-matrix-wrap no-scrollbar"><table class="collect-matrix-table" role="grid" aria-label="收集图鉴矩阵"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+        return `<div class="collect-matrix-wrap no-scrollbar"><table class="collect-matrix-table" role="grid" aria-label="收集图鉴"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
     }
 
     function buildCollectMatrixCompactHTML(items, focusCategoryId) {
@@ -6241,7 +6241,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     <span class="text-xs text-[#8d7f73] font-bold min-w-0 inline-flex items-baseline flex-wrap gap-x-1"><span>图鉴进度</span><span class="text-[#b85c6f] text-sm font-extrabold leading-none">${unlockedCells}/${totalCells}</span><span>(${progressPct}%)</span><span class="text-[10px] text-[#a08f82] ml-1">已收集 ${uniqueCollectibles} 款</span></span>
                     <div class="flex rounded-lg bg-white/55 p-0.5 border border-[#eaddcf] flex-shrink-0 self-center">
                         <button type="button" class="cabinet-segment-btn flex-1 py-1 px-2.5 rounded-md text-[11px] font-bold transition-all bg-[#ff8fab] text-white" data-cabinet-segment="tier">按分区</button>
-                        <button type="button" class="cabinet-segment-btn flex-1 py-1 px-2.5 rounded-md text-[11px] font-bold transition-all text-[#8d7f73] bg-transparent" data-cabinet-segment="matrix">图鉴矩阵</button>
+                        <button type="button" class="cabinet-segment-btn flex-1 py-1 px-2.5 rounded-md text-[11px] font-bold transition-all text-[#8d7f73] bg-transparent" data-cabinet-segment="matrix">图鉴</button>
                     </div>
                 </div>
 

@@ -88,7 +88,7 @@ BEGIN_ROCCO_CSS
         .cabinet-progress-meter {
             height: 8px;
             border-radius: 999px;
-            background: rgba(45, 32, 68, 0.12);
+            background: rgba(92, 74, 58, 0.14);
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
             overflow: hidden;
             margin-top: 4px;
@@ -96,8 +96,8 @@ BEGIN_ROCCO_CSS
         .cabinet-progress-meter__fill {
             height: 100%;
             border-radius: 999px;
-            background: linear-gradient(90deg, #7c3aed 0%, #c026d3 40%, #f59e0b 100%);
-            box-shadow: 0 0 10px rgba(192, 38, 211, 0.45);
+            background: linear-gradient(90deg, #d4c4a8 0%, #b8956a 45%, #8f6a3e 100%);
+            box-shadow: 0 0 8px rgba(143, 106, 62, 0.28);
             transition: width 0.35s ease;
         }
         .cabinet-segment-wrap {
@@ -127,11 +127,11 @@ BEGIN_ROCCO_CSS
             transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
         }
         .cabinet-segment-btn--active {
-            background: linear-gradient(180deg, #a855f7 0%, #7c3aed 55%, #5b21b6 100%);
-            color: #fff;
+            background: linear-gradient(180deg, #a89878 0%, #7d6b52 48%, #5c4d3d 100%);
+            color: #fffaf3;
             box-shadow:
-                0 1px 0 rgba(255, 255, 255, 0.35) inset,
-                0 3px 8px rgba(91, 33, 182, 0.45);
+                0 1px 0 rgba(255, 255, 255, 0.28) inset,
+                0 3px 10px rgba(70, 55, 40, 0.28);
         }
         .cabinet-segment-btn--idle {
             background: transparent;
@@ -150,19 +150,19 @@ BEGIN_ROCCO_CSS
             border-radius: 0.65rem;
             font-size: 10px;
             line-height: 1.4;
-            color: #3b2f5c;
+            color: #4a4036;
             font-weight: 700;
             background:
-                linear-gradient(90deg, rgba(255, 243, 210, 0.95) 0%, rgba(230, 210, 255, 0.75) 50%, rgba(255, 243, 210, 0.9) 100%);
-            border: 1px solid rgba(180, 140, 220, 0.45);
+                linear-gradient(90deg, rgba(255, 250, 238, 0.98) 0%, rgba(245, 236, 218, 0.96) 50%, rgba(252, 246, 232, 0.98) 100%);
+            border: 1px solid rgba(160, 135, 100, 0.4);
             box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.7),
-                0 4px 12px rgba(60, 40, 90, 0.12);
+                inset 0 1px 0 rgba(255, 255, 255, 0.75),
+                0 3px 10px rgba(60, 48, 36, 0.08);
         }
         .cabinet-suggestion-banner i {
             flex-shrink: 0;
             margin-top: 2px;
-            color: #7c3aed;
+            color: #6b7c5c;
         }
 
         .cabinet-main-panel {
@@ -236,10 +236,10 @@ BEGIN_ROCCO_CSS
             font-size: 9px;
             font-weight: 800;
             line-height: 1.25;
-            color: #6b21a8;
-            background: linear-gradient(180deg, rgba(255, 250, 255, 0.95), rgba(237, 222, 255, 0.9));
-            border: 1px solid rgba(167, 139, 250, 0.55);
-            box-shadow: 0 1px 3px rgba(91, 33, 182, 0.12);
+            color: #5c4a38;
+            background: linear-gradient(180deg, rgba(255, 250, 255, 0.95), rgba(235, 224, 205, 0.92));
+            border: 1px solid rgba(160, 135, 100, 0.42);
+            box-shadow: 0 1px 3px rgba(70, 55, 40, 0.1);
         }
 
         .cabinet-matrix-layout-btn {
@@ -256,10 +256,10 @@ BEGIN_ROCCO_CSS
         .cabinet-matrix-layout-btn--active {
             opacity: 1;
             box-shadow:
-                0 0 0 2px rgba(168, 85, 247, 0.55),
+                0 0 0 2px rgba(184, 154, 106, 0.55),
                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            border-color: rgba(124, 58, 237, 0.45);
-            color: #4c1d95;
+            border-color: rgba(143, 106, 62, 0.45);
+            color: #5c4a38;
         }
         .cabinet-matrix-layout-btn:not(.cabinet-matrix-layout-btn--active) {
             opacity: 0.72;
@@ -322,7 +322,7 @@ BEGIN_ROCCO_CSS
             position: absolute;
             width: 10px;
             height: 10px;
-            border: 2px solid rgba(91, 33, 182, 0.35);
+            border: 2px solid rgba(100, 82, 58, 0.38);
             pointer-events: none;
         }
         .cabinet-detail-artframe::before {
@@ -378,16 +378,16 @@ BEGIN_ROCCO_CSS
             border-radius: 0.65rem;
             font-weight: 800;
             font-size: 13px;
-            color: #fff;
+            color: #fffaf5;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 0.4rem;
-            background: linear-gradient(180deg, #e879f9 0%, #c026d3 40%, #7c3aed 100%);
+            background: linear-gradient(180deg, #c9a87a 0%, #9a7349 42%, #6b4e32 100%);
             box-shadow:
-                0 1px 0 rgba(255, 255, 255, 0.35) inset,
-                0 4px 14px rgba(124, 58, 237, 0.45);
+                0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 4px 14px rgba(80, 55, 35, 0.32);
             transition: transform 0.12s ease, filter 0.12s ease;
         }
         .cabinet-detail-primary-btn:hover {
@@ -403,7 +403,7 @@ BEGIN_ROCCO_CSS
             border-radius: 999px;
             font-size: 12px;
             font-weight: 700;
-            color: #5b4a7a;
+            color: #5c5348;
             background: rgba(255, 255, 255, 0.55);
             border: 1px solid rgba(120, 90, 50, 0.35);
             cursor: pointer;

@@ -63,7 +63,7 @@ BEGIN_ROCCO_CSS
             flex-direction: column;
             height: 100%;
             min-height: 0;
-            gap: 0.5rem;
+            gap: 0.55rem;
         }
         .cabinet-chrome-bar {
             flex-shrink: 0;
@@ -170,7 +170,7 @@ BEGIN_ROCCO_CSS
             min-height: 0;
             display: flex;
             flex-direction: column;
-            padding: 0.55rem 0.5rem 0.45rem;
+            padding: 0.55rem 0.62rem 0.6rem;
             border-radius: 0.85rem;
             background:
                 linear-gradient(180deg, rgba(255, 252, 245, 0.92) 0%, rgba(248, 238, 220, 0.96) 100%);
@@ -192,8 +192,8 @@ BEGIN_ROCCO_CSS
         .cabinet-matrix-toolbar {
             display: flex;
             flex-direction: column;
-            gap: 0.45rem;
-            margin-bottom: 0.45rem;
+            gap: 0.6rem;
+            margin-bottom: 0.6rem;
         }
         .cabinet-matrix-toolbar__meta {
             display: flex;
@@ -205,7 +205,7 @@ BEGIN_ROCCO_CSS
         .cabinet-matrix-toolbar__filters {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.4rem;
+            gap: 0.5rem;
             align-items: stretch;
         }
         @media (min-width: 520px) {
@@ -218,11 +218,12 @@ BEGIN_ROCCO_CSS
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            gap: 0.45rem;
+            gap: 0.55rem;
+            margin-top: 0.2rem;
         }
         .cabinet-matrix-toolbar__views {
             display: flex;
-            gap: 0.35rem;
+            gap: 0.45rem;
             flex-wrap: wrap;
             margin-left: auto;
         }
@@ -269,17 +270,17 @@ BEGIN_ROCCO_CSS
         .cabinet-item-detail.cabinet-detail-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 0.65rem;
+            gap: 0.9rem;
             align-items: start;
             width: 100%;
             max-height: 85vh;
             overflow-y: auto;
-            padding: 0.15rem 0.1rem 0.35rem;
+            padding: 0.35rem 0.2rem 0.5rem;
         }
         @media (min-width: 420px) {
             .cabinet-item-detail.cabinet-detail-grid {
                 grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.12fr);
-                gap: 0.75rem 0.85rem;
+                gap: 0.85rem 1rem;
             }
         }
         .cabinet-detail-art-column {
@@ -352,9 +353,16 @@ BEGIN_ROCCO_CSS
         .cabinet-detail-info-column {
             display: flex;
             flex-direction: column;
-            gap: 0.4rem;
+            gap: 0.6rem;
             min-width: 0;
             text-align: center;
+        }
+        .cabinet-detail-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            width: 100%;
+            margin-top: 0.15rem;
         }
         @media (min-width: 420px) {
             .cabinet-detail-info-column {
@@ -370,9 +378,12 @@ BEGIN_ROCCO_CSS
             justify-content: center;
             gap: 0.35rem;
         }
+        .cabinet-detail-actions .cabinet-detail-primary-btn {
+            margin-top: 0;
+        }
         .cabinet-detail-primary-btn {
             width: 100%;
-            margin-top: 0.5rem;
+            margin-top: 0.65rem;
             padding: 0.75rem 0.85rem;
             border: none;
             border-radius: 0.65rem;
@@ -396,8 +407,11 @@ BEGIN_ROCCO_CSS
         .cabinet-detail-primary-btn:active {
             transform: scale(0.98);
         }
+        .cabinet-detail-actions .cabinet-detail-back-btn {
+            margin-top: 0;
+        }
         .cabinet-detail-back-btn {
-            margin-top: 0.35rem;
+            margin-top: 0.5rem;
             align-self: center;
             padding: 0.35rem 0.85rem;
             border-radius: 999px;
@@ -423,6 +437,7 @@ BEGIN_ROCCO_CSS
             border: 1px solid rgba(139, 105, 60, 0.3);
             background: linear-gradient(180deg, rgba(255, 252, 245, 0.95), rgba(245, 232, 210, 0.88));
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            margin-top: 0.2rem;
         }
         #modal-panel[data-modal-variant="cabinet"][data-cabinet-subview="detail"] .cabinet-catalog-details summary {
             text-align: left;

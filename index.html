@@ -9501,13 +9501,58 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         input_unreachable: '图片源无法访问'
     };
 
+    /** 浏览器侧拉取同源或已放行 URL，供 store 422 时重试（服务端无法 fetch 相对路径或部分 HTTPS 图时）。 */
+    async function diaryFetchImageAsDataUrl(url) {
+        const u = String(url || '').trim();
+        if (!u) return '';
+        if (u.startsWith('data:image/')) return u;
+        try {
+            const r = await fetch(u, { mode: 'cors', credentials: 'same-origin' });
+            if (!r.ok) return '';
+            const blob = await r.blob();
+            return await new Promise((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(String(fr.result || ''));
+                fr.onerror = () => reject(fr.error);
+                fr.readAsDataURL(blob);
+            });
+        } catch {
+            return '';
+        }
+    }
+
+    async function persistDiaryImageViaStoreApi(diaryId, displayUrl) {
+        const id = String(diaryId || '').trim();
+        const du = String(displayUrl || '');
+        const payload = { diaryId: id, source: 'aigc' };
+        if (du.startsWith('data:image/')) payload.imageDataUrl = du;
+        else payload.imageUrl = du;
+        const post = (body) =>
+            fetch(DIARY_IMAGE_STORE_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        let res = await post(payload);
+        if (!res.ok && res.status === 422) {
+            const asData = await diaryFetchImageAsDataUrl(du);
+            if (asData && asData.startsWith('data:image/')) {
+                res = await post({ diaryId: id, source: 'aigc', imageDataUrl: asData });
+            }
+        }
+        return res;
+    }
+
     function normalizeDiaryImageEntry(entry) {
         if (!entry) return null;
         if (typeof entry === 'string') {
             return {
                 storage: entry,
                 display: entry,
-                stableUrl: /^https?:\/\//i.test(entry) || entry.startsWith('/') ? entry : '',
+                stableUrl:
+                    /^https?:\/\//i.test(entry) || entry.startsWith('/') || entry.startsWith('data:image/')
+                        ? entry
+                        : '',
                 sourceType: isDiaryImageIdbRef(entry) ? 'idb' : (entry.startsWith('data:') ? 'data' : 'url')
             };
         }
@@ -10752,11 +10797,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     transient: isInlineDataUrl
                 };
                 try {
-                    const storeRes = await fetch(DIARY_IMAGE_STORE_API, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ diaryId: idEsc, imageUrl: displayUrl, source: 'aigc' })
-                    });
+                    const storeRes = await persistDiaryImageViaStoreApi(idEsc, displayUrl);
                     if (storeRes.ok) {
                         const storeData = await storeRes.json().catch(() => ({}));
                         if (storeData && storeData.stableUrl) {

@@ -4,6 +4,25 @@ import { getDiaryImageMetrics, recordDiaryImageEvent } from '../lib/diary-image-
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+function siteOriginFromRequest(request) {
+  const fwdHost = request.headers.get('x-forwarded-host');
+  const fwdProto = (request.headers.get('x-forwarded-proto') || 'https').split(',')[0].trim();
+  if (fwdHost) {
+    const host = fwdHost.split(',')[0].trim();
+    return `${fwdProto}://${host}`;
+  }
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return '';
+  }
+}
+
+function siteOriginForUpstreamFetch() {
+  if (process.env.VERCEL_URL) return `https://${String(process.env.VERCEL_URL).replace(/^https?:\/\//, '')}`;
+  return '';
+}
+
 function extractImageUrl(data) {
   const message = data?.choices?.[0]?.message;
   if (!message) return '';
@@ -30,7 +49,7 @@ function extractImageUrl(data) {
   return '';
 }
 
-async function runJob(job) {
+async function runJob(job, request) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     await updateDiaryImageJob(job.id, { status: 'failed', errorCode: 'missing_api_key', errorMessage: 'OPENROUTER_API_KEY missing' });
@@ -66,7 +85,9 @@ async function runJob(job) {
       const imageSrc = extractImageUrl(data);
       if (!imageSrc) throw new Error('no_image_generated');
 
-      const dataUrl = await toDataUrlFromFlexibleSource(imageSrc);
+      const origin =
+        (request && siteOriginFromRequest(request)) || siteOriginForUpstreamFetch();
+      const dataUrl = await toDataUrlFromFlexibleSource(imageSrc, { siteOrigin: origin });
       if (!dataUrl) throw new Error('image_fetch_failed');
 
       const persisted = await persistDiaryImageFromDataUrl(dataUrl, { diaryId: job.diaryId, source: 'aigc', prefix: 'hero' });
@@ -113,7 +134,9 @@ export async function POST(request) {
     if (!diaryId || !input) {
       return Response.json({ error: 'missing_input', message: 'diaryId and image source are required.' }, { status: 400 });
     }
-    const dataUrl = await toDataUrlFromFlexibleSource(input);
+    const dataUrl = await toDataUrlFromFlexibleSource(input, {
+      siteOrigin: siteOriginFromRequest(request)
+    });
     if (!dataUrl) {
       recordDiaryImageEvent('load_error', { reason: 'store_input_unreachable', diaryId });
       return Response.json({ error: 'input_unreachable' }, { status: 422 });
@@ -141,7 +164,7 @@ export async function POST(request) {
   // Serverless runtimes are not reliable for fire-and-forget background work.
   // Run inline and return terminal status to avoid client-side poll timeouts.
   try {
-    await runJob(job);
+    await runJob(job, request);
     const latest = await getDiaryImageJob(job.id);
     return Response.json({
       ok: true,

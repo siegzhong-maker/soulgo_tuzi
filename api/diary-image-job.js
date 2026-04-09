@@ -74,12 +74,13 @@ async function runJob(job) {
 
       const isRetry = i > 1;
       recordDiaryImageEvent(isRetry ? 'retry_success' : 'gen_success', { diaryId: String(job.diaryId || '') });
+      const inline = String(persisted.stableUrl || '').startsWith('data:image/');
       await updateDiaryImageJob(job.id, {
         status: 'ready',
         result: {
           ...persisted,
           image_url: persisted.stableUrl,
-          source: 'stable_asset'
+          source: inline ? 'inline_dataurl' : 'stable_asset'
         }
       });
       return;

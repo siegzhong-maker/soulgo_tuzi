@@ -137,11 +137,31 @@ export async function POST(request) {
     reference_image_data_url: referenceImageDataUrl,
     reference_image_url: referenceImageUrl
   });
-  runJob(job).catch((e) => {
+  // Serverless runtimes are not reliable for fire-and-forget background work.
+  // Run inline and return terminal status to avoid client-side poll timeouts.
+  try {
+    await runJob(job);
+    const latest = await getDiaryImageJob(job.id);
+    return Response.json({
+      ok: true,
+      jobId: job.id,
+      status: latest?.status || 'queued',
+      attempts: latest?.attempts || 0,
+      errorCode: latest?.errorCode || '',
+      errorMessage: latest?.errorMessage || '',
+      result: latest?.result || null
+    });
+  } catch (e) {
     const msg = String(e?.message || e || 'job_crashed');
-    void updateDiaryImageJob(job.id, { status: 'failed', errorCode: 'job_crashed', errorMessage: msg });
-  });
-  return Response.json({ ok: true, jobId: job.id, status: 'queued' });
+    await updateDiaryImageJob(job.id, { status: 'failed', errorCode: 'job_crashed', errorMessage: msg });
+    return Response.json({
+      ok: true,
+      jobId: job.id,
+      status: 'failed',
+      errorCode: 'job_crashed',
+      errorMessage: msg
+    });
+  }
 }
 
 export async function GET(request) {

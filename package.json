@@ -7,6 +7,7 @@
   "scripts": {
     "local": "vercel dev",
     "verify:rabbit-assets": "node scripts/verify-rabbit-assets.mjs",
+    "validate:pet-home-manifest": "node scripts/validate-pet-home-manifest.mjs",
     "generate:badges": "node scripts/batch-generate-travel-badges.mjs",
     "ingest:checkin": "node scripts/ingest-checkin-export.mjs"
   },

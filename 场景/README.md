@@ -51,6 +51,10 @@
 
 **前端：** 应用加载时会 `fetch('场景/generated/badges/manifest.json')` 合并进国内池与按 `poolKey` 的地点池。开发抽检可在 URL 加 **`?badge_lab=1`** 打开全屏缩略图网格。
 
+**pet-home-assets 主清单（全国城市场景）**
+
+部署时需保证浏览器能请求 **`场景/generated/pet-home-assets/manifest.json`** 及清单中引用的 **`场景/generated/pet-home-assets/badges/**`** PNG；否则国内静态同城池为空（此时会依赖 `/api/generate-collectible` 强制兜底）。发布前可在仓库根目录执行 **`npm run validate:pet-home-manifest`** 做校验。
+
 **`--base-url` 报 `fetch failed` / `Connect Timeout`：** 说明连不上 Vercel。国内直连常被墙；需 **HTTP 代理**（如 `export HTTPS_PROXY=http://127.0.0.1:7890`，Clash 的 **HTTP** 端口，不是 mixed 误用成 socks-only）。注意：Node 的 `fetch` **不会自动读** 环境变量里的代理，脚本已用 `undici` 的 **ProxyAgent** 显式走 `HTTPS_PROXY`/`HTTP_PROXY`。若仍超时，检查 Clash「允许局域网连接」、用 `curl -x $HTTPS_PROXY -I https://soulgo-tuzi.vercel.app` 测代理。
 
 ---

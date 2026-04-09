@@ -2,7 +2,7 @@
  * Vercel Serverless Function: generate structured travel memory summary + emotion.
  * Uses OpenRouter chat completions with a Mem0-style fact extraction prompt.
  */
-import { getSoulShortBlurb } from './load-soul.js';
+import { getSoulShortBlurb } from '../lib/load-soul.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 

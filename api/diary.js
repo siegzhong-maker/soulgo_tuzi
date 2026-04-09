@@ -1,4 +1,4 @@
-import { getSoulTextForPrompt } from './load-soul.js';
+import { getSoulTextForPrompt } from '../lib/load-soul.js';
 
 /**
  * Vercel Serverless Function: generate travel diary + behavior/cabinet/thinking JSON via OpenRouter + RAG.

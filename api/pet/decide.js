@@ -3,7 +3,7 @@
  * Accepts POST { mood, health, currentState, lastUserAction?, recentBehaviors?, timestamp }
  * Returns { intent, reason } with intent one of: go_to_bed_and_rest, check_cabinet, wait_at_door, play_with_user, walk_randomly.
  */
-import { getSoulShortBlurb } from '../load-soul.js';
+import { getSoulShortBlurb } from '../../lib/load-soul.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const UPSTREAM_TIMEOUT_MS = 8000;

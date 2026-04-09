@@ -1,4 +1,4 @@
-import { getSoulShortBlurb } from './load-soul.js';
+import { getSoulShortBlurb } from '../lib/load-soul.js';
 
 /**
  * Vercel Serverless: multimodal image commentary in Soul (小粟) voice via OpenRouter.

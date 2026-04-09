@@ -3362,6 +3362,54 @@
         return true;
     }
 
+    /** 清空「最小编号」且仍有内容的日记图片块（不依赖 episodic 是否引用） */
+    function trimDiaryImagesClearOldestBlockForQuota() {
+        const imgs = appState.diaryImages;
+        if (!imgs || typeof imgs !== 'object') return false;
+        const keys = Object.keys(imgs).filter((k) => Array.isArray(imgs[k]) && imgs[k].length > 0);
+        if (!keys.length) return false;
+        keys.sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+        const diaryId = keys[0];
+        imgs[diaryId] = [];
+        if (appState.diaryImageMeta && appState.diaryImageMeta[diaryId]) delete appState.diaryImageMeta[diaryId];
+        if (appState.diaryImageComments && appState.diaryImageComments[diaryId]) delete appState.diaryImageComments[diaryId];
+        console.warn('[saveState] Cleared diaryImages block for diaryId', diaryId, 'for quota.');
+        return true;
+    }
+
+    /** 清空橱柜单项中最大的 scene.image / furniture.image 的 data URL */
+    function trimCabinetItemsDataUrlsForQuota() {
+        const items = appState.cabinetItems;
+        if (!Array.isArray(items) || items.length === 0) return false;
+        let bestI = -1;
+        let bestLen = 0;
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            let im = '';
+            if (it && it.scene && typeof it.scene.image === 'string') im = it.scene.image;
+            else if (it && it.type === 'furniture' && typeof it.image === 'string') im = it.image;
+            if (im.startsWith('data:') && im.length > bestLen) {
+                bestLen = im.length;
+                bestI = i;
+            }
+        }
+        if (bestI < 0) return false;
+        const it = items[bestI];
+        if (it.scene && typeof it.scene.image === 'string' && it.scene.image.startsWith('data:')) it.scene.image = '';
+        if (it.type === 'furniture' && typeof it.image === 'string' && it.image.startsWith('data:')) it.image = '';
+        console.warn('[saveState] Cleared cabinet item data URL image for quota (index ' + bestI + ').');
+        return true;
+    }
+
+    /** 移除最旧一条情景记忆（最后手段） */
+    function trimEpisodicPopOldestForQuota() {
+        const eps = appState.memories && appState.memories.episodic;
+        if (!Array.isArray(eps) || eps.length === 0) return false;
+        eps.shift();
+        console.warn('[saveState] Removed oldest episodic memory entry for quota.');
+        return true;
+    }
+
     function saveState() {
         try {
             localStorage.setItem(APP_STATE_KEY, JSON.stringify(appState));
@@ -3380,10 +3428,16 @@
                     } else if (trimOldestDiaryImagesBlock()) {
                         did = true;
                         console.warn('[saveState] Cleared oldest diary image block (refs or mixed) to free quota.');
+                    } else if (trimDiaryImagesClearOldestBlockForQuota()) {
+                        did = true;
                     } else if (trimEpisodicHeavyFieldsForQuota()) {
                         did = true;
                         console.warn('[saveState] Slimmed episodic scene/reward/text to free quota.');
                     } else if (trimPlacedFurnitureForQuota()) {
+                        did = true;
+                    } else if (trimCabinetItemsDataUrlsForQuota()) {
+                        did = true;
+                    } else if (trimEpisodicPopOldestForQuota()) {
                         did = true;
                     }
                     if (!did) break;

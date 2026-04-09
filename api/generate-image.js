@@ -7,6 +7,18 @@
  */
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_REFERENCE_DATA_URL_LEN = 6 * 1024 * 1024;
+function detectMimeFromImageUrl(imageUrl) {
+    const s = String(imageUrl || '').trim();
+    if (s.startsWith('data:image/')) {
+        const m = s.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i);
+        return m ? m[1].toLowerCase() : 'image/png';
+    }
+    const lower = s.toLowerCase();
+    if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg';
+    if (lower.includes('.webp')) return 'image/webp';
+    if (lower.includes('.gif')) return 'image/gif';
+    return 'image/png';
+}
 
 export async function POST(request) {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -189,8 +201,18 @@ export async function POST(request) {
             );
         }
 
+        const traceId = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const mime = detectMimeFromImageUrl(imageUrl);
+        const imageB64 = typeof imageUrl === 'string' && imageUrl.startsWith('data:image/')
+            ? imageUrl.split(',')[1] || ''
+            : '';
         return new Response(
-            JSON.stringify({ image_url: imageUrl }),
+            JSON.stringify({
+                image_url: imageUrl,
+                image_b64: imageB64 || undefined,
+                mime,
+                trace_id: traceId
+            }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
 

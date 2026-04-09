@@ -5843,19 +5843,28 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         return String(scene.image).includes('/pet-home-assets/');
     }
 
-    /** 地点专属收集物池：北京示例，其他地点用通用池。 */
+    /** 用户输入别名 → manifest 目录 poolKey（禁止模糊 includes 误匹配） */
+    const COLLECTIBLE_POOL_KEY_ALIASES = {
+        潮汕: '潮州',
+        潮汕地区: '潮州',
+        潮汕区: '潮州'
+    };
+    /** manifest / apply 注册过的 poolKey，用于 resolve 与严格同城判断 */
+    const registeredCollectiblePoolKeys = new Set();
+
+    /** 地点专属收集物池：北京示例；B 档仅同城（演示不再混入广州/上海） */
     const LOCATION_COLLECTIBLE_POOLS = {
         '北京': {
             S: nfcPresetAssets,
             A: hiddenSceneAssets,
-            B: [sceneAssets['北京'], sceneAssets['广州'], sceneAssets['上海']],
+            B: [sceneAssets['北京']],
             C: []
         }
     };
     const defaultPool = {
         S: nfcPresetAssets,
         A: hiddenSceneAssets,
-        B: domesticScenePool,
+        B: [],
         C: []
     };
 
@@ -5963,6 +5972,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             COLLECTIBLE_CATALOG_BY_LABEL.set(sceneObj.label, sceneObj);
             SCENE_LABEL_TO_COLLECT_CATEGORY.set(sceneObj.label, sceneObj.collectCategory);
             if (poolKey) {
+                registeredCollectiblePoolKeys.add(poolKey);
                 if (!LOCATION_COLLECTIBLE_POOLS[poolKey]) {
                     LOCATION_COLLECTIBLE_POOLS[poolKey] = {
                         S: nfcPresetAssets,
@@ -6204,6 +6214,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const d = window.__lastCollectibleDecision;
         if (!d || typeof d !== 'object') return '';
         const parts = [];
+        if (d.poolKey) parts.push(`poolKey=${d.poolKey}`);
+        if (d.strictDomesticCity) parts.push('strictCity=1');
         if (d.selectedSourceType) parts.push(`来源=${d.selectedSourceType}`);
         if (d.memoryTag) parts.push(`memory=${d.memoryTag}`);
         if (Array.isArray(d.preferredCategories) && d.preferredCategories.length) {
@@ -6325,13 +6337,43 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         return raw;
     }
 
-    function sceneMatchesCheckinLocation(scene, normalized) {
-        if (!normalized || !scene) return true;
+    function sceneMatchesCheckinLocation(scene, poolKeyNorm) {
+        if (!poolKeyNorm || !scene) return true;
         const pk = scene.poolKey != null ? String(scene.poolKey).trim() : '';
-        if (pk && pk === normalized) return true;
+        if (pk && pk === poolKeyNorm) return true;
         const lab = String(scene.label || '');
-        if (lab.startsWith(normalized + '·')) return true;
+        if (lab.startsWith(poolKeyNorm + '·')) return true;
         return false;
+    }
+
+    function resolveCollectiblePoolKey(raw) {
+        let n = typeof normalizeLocationName === 'function' ? normalizeLocationName(raw || '') : String(raw || '').trim();
+        if (!n) return '';
+        if (COLLECTIBLE_POOL_KEY_ALIASES[n]) n = COLLECTIBLE_POOL_KEY_ALIASES[n];
+        return n;
+    }
+
+    function getPetHomeScenesForPoolKey(poolKeyNorm) {
+        if (!poolKeyNorm) return [];
+        return soulgoGeneratedBadgeScenes.filter(
+            (s) => s && isPetHomeScene(s) && sceneMatchesCheckinLocation(s, poolKeyNorm)
+        );
+    }
+
+    /** 同城 manifest 扫描 + LOCATION.B 中同城 pet-home 并集（按 label 去重） */
+    function mergeLocalPetHomeBPool(poolKeyNorm) {
+        const fromPool =
+            LOCATION_COLLECTIBLE_POOLS[poolKeyNorm] && Array.isArray(LOCATION_COLLECTIBLE_POOLS[poolKeyNorm].B)
+                ? LOCATION_COLLECTIBLE_POOLS[poolKeyNorm].B.filter(isPetHomeScene).filter((s) =>
+                      sceneMatchesCheckinLocation(s, poolKeyNorm)
+                  )
+                : [];
+        const fromManifest = getPetHomeScenesForPoolKey(poolKeyNorm);
+        const map = new Map();
+        [...fromPool, ...fromManifest].forEach((s) => {
+            if (s && s.label) map.set(s.label, s);
+        });
+        return Array.from(map.values());
     }
 
     /** 根据 memoryScore 与地点从专属池抽取未获得的收集物。演示模式下可传入 forcedTier 固定等级；若提供 memoryTag 则优先匹配同主题场景。 */
@@ -6343,21 +6385,31 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         })();
         const originalTier = tier;
         const intent = buildCollectibleIntent(location, memoryTag, ragSource);
-        const normalized = typeof normalizeLocationName === 'function' ? normalizeLocationName(location || '') : String(location || '').trim();
-        const pool = LOCATION_COLLECTIBLE_POOLS[normalized] || defaultPool;
-        const cityExclusivePool = Object.prototype.hasOwnProperty.call(LOCATION_COLLECTIBLE_POOLS, normalized)
-            && LOCATION_COLLECTIBLE_POOLS[normalized] === pool;
+        const poolKey = resolveCollectiblePoolKey(location);
+        const pool = LOCATION_COLLECTIBLE_POOLS[poolKey] || defaultPool;
+        const mergedLocalPetHome = mergeLocalPetHomeBPool(poolKey);
+        const chinaNoLocal =
+            typeof isChinaLocation === 'function' &&
+            isChinaLocation(location) &&
+            mergedLocalPetHome.length === 0;
+        /** 凡 manifest/池内已有该 poolKey 的 pet-home 徽章，则 S/A/B/C 均不串到全球 NFC/隐藏款（不依赖 locationMap 是否收录该城） */
+        const strictDomesticCity = mergedLocalPetHome.length > 0;
+        const cityExclusivePool =
+            Object.prototype.hasOwnProperty.call(LOCATION_COLLECTIBLE_POOLS, poolKey) &&
+            LOCATION_COLLECTIBLE_POOLS[poolKey] === pool;
         const obtainedLabels = new Set((appState.cabinetItems || []).map((i) => (i.scene && i.scene.label) || i.location || '').filter(Boolean));
-        let tierPool = pool[tier] || [];
-        if (!Array.isArray(tierPool)) tierPool = [];
+
         const debugInfo = {
-            location: normalized || String(location || ''),
+            location: poolKey || String(location || '').trim(),
+            poolKey: poolKey || '',
+            chinaNoLocal,
+            strictDomesticCity,
             originalTier,
             finalTier: tier,
             memoryTag: normalizeMemoryTag(memoryTag),
             preferredCategories: intent.preferredCategories || [],
-            tierPoolCountBeforeFilters: tierPool.length,
-            tierPoolCountAfterSourceFilter: 0,
+            tierPoolCountBeforeFilters: 0,
+            tierPoolCountAfterSourceFilter: mergedLocalPetHome.length,
             availableCountAfterTagFilter: 0,
             availableCountAfterCategoryFilter: 0,
             fallbackTriggered: false,
@@ -6368,60 +6420,60 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             profileEvidence: intent.profileEvidence || []
         };
 
-        // C/B 只从 pet-home-assets 出货；C 复用 B 池中的 pet 素材。
-        if (tier === 'C') {
-            const bPool = Array.isArray(pool.B) ? pool.B : [];
-            tierPool = bPool.filter(isPetHomeScene);
-        } else if (tier === 'B') {
-            tierPool = tierPool.filter(isPetHomeScene);
-        }
-        if (cityExclusivePool && (tier === 'B' || tier === 'C')) {
-            tierPool = tierPool.filter((s) => sceneMatchesCheckinLocation(s, normalized));
-        }
-        debugInfo.tierPoolCountAfterSourceFilter = tierPool.length;
-
-        // A/S 优先 original 稀缺素材，不足再回退同 tier 常规池。
-        let preferredRare = [];
-        if (tier === 'A') preferredRare = originalRareScenesByTier.A;
-        if (tier === 'S') preferredRare = originalRareScenesByTier.S;
-
-        // 若提供 memoryTag，则在当前 tier 内优先筛选 memoryTag 一致的场景
-        let available = tierPool.filter((s) => s && s.label && !obtainedLabels.has(s.label));
-        if ((tier === 'A' || tier === 'S') && preferredRare.length > 0) {
-            const rareAvailable = preferredRare.filter((s) => s && s.label && !obtainedLabels.has(s.label));
-            if (rareAvailable.length > 0) available = rareAvailable;
-        }
-        if (memoryTag) {
-            const wantedTag = normalizeMemoryTag(memoryTag);
-            const tagged = available.filter((s) => normalizeMemoryTag(s.memoryTag) === wantedTag);
-            if (tagged.length > 0) {
-                available = tagged;
+        function baseAvailableForTier(t) {
+            if (chinaNoLocal) return [];
+            if (strictDomesticCity) {
+                return mergedLocalPetHome.filter((s) => s && s.label && !obtainedLabels.has(s.label));
             }
+            if (t === 'C' || t === 'B') {
+                return mergedLocalPetHome.filter((s) => s && s.label && !obtainedLabels.has(s.label));
+            }
+            let tierPool = (pool[t] && Array.isArray(pool[t]) ? pool[t] : []).slice();
+            if (t === 'A' || t === 'S') {
+                const preferredRare = t === 'A' ? originalRareScenesByTier.A : originalRareScenesByTier.S;
+                let avail = tierPool.filter((s) => s && s.label && !obtainedLabels.has(s.label));
+                if (preferredRare.length > 0) {
+                    const rareAvailable = preferredRare.filter((s) => s && s.label && !obtainedLabels.has(s.label));
+                    if (rareAvailable.length > 0) avail = rareAvailable;
+                }
+                return avail;
+            }
+            return [];
         }
+
+        function applyMemoryTagFilter(avail) {
+            if (!memoryTag) return avail;
+            const wantedTag = normalizeMemoryTag(memoryTag);
+            const tagged = avail.filter((s) => normalizeMemoryTag(s.memoryTag) === wantedTag);
+            if (tagged.length > 0) return tagged;
+            if (strictDomesticCity) return avail;
+            return avail;
+        }
+
+        function applyCategoryFilter(avail) {
+            const prefCats = intent && Array.isArray(intent.preferredCategories) ? intent.preferredCategories : [];
+            if (!COLLECTIBLE_POLICY.enablePreferredCategorySoftFilter || prefCats.length === 0) return avail;
+            const byCat = avail.filter((s) => prefCats.includes((s && s.collectCategory) || COLLECT_CATEGORY_FALLBACK_ID));
+            if (byCat.length > 0) return byCat;
+            return avail;
+        }
+
+        let available = baseAvailableForTier(tier);
+        debugInfo.tierPoolCountBeforeFilters = available.length;
+        available = applyMemoryTagFilter(available);
         debugInfo.availableCountAfterTagFilter = available.length;
-        const prefCats = intent && Array.isArray(intent.preferredCategories) ? intent.preferredCategories : [];
-        if (COLLECTIBLE_POLICY.enablePreferredCategorySoftFilter && prefCats.length > 0) {
-            const byCat = available.filter((s) => prefCats.includes((s && s.collectCategory) || COLLECT_CATEGORY_FALLBACK_ID));
-            if (byCat.length > 0) available = byCat;
-        }
+        available = applyCategoryFilter(available);
         debugInfo.availableCountAfterCategoryFilter = available.length;
+
         if (available.length === 0) {
             debugInfo.fallbackTriggered = true;
             const fallbackOrder = ['S', 'A', 'B', 'C'];
             const idx = fallbackOrder.indexOf(tier);
             for (let i = idx + 1; i < fallbackOrder.length; i++) {
                 const t = fallbackOrder[i];
-                const p = pool[t] || [];
-                let nextAvail = (Array.isArray(p) ? p : []).filter((s) => s && s.label && !obtainedLabels.has(s.label));
-                if (t === 'C') {
-                    const bPool = Array.isArray(pool.B) ? pool.B : [];
-                    nextAvail = bPool.filter(isPetHomeScene).filter((s) => s && s.label && !obtainedLabels.has(s.label));
-                } else if (t === 'B') {
-                    nextAvail = nextAvail.filter(isPetHomeScene);
-                }
-                if (cityExclusivePool && (t === 'B' || t === 'C')) {
-                    nextAvail = nextAvail.filter((s) => sceneMatchesCheckinLocation(s, normalized));
-                }
+                let nextAvail = baseAvailableForTier(t);
+                nextAvail = applyMemoryTagFilter(nextAvail);
+                nextAvail = applyCategoryFilter(nextAvail);
                 if (nextAvail.length > 0) {
                     available = nextAvail;
                     tier = t;
@@ -6430,15 +6482,24 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             }
         }
         debugInfo.finalTier = tier;
+
         if (available.length === 0) {
-            let allItems = [...(pool.S || []), ...(pool.A || []), ...(pool.B || []), ...(pool.C || [])];
-            if (cityExclusivePool) {
-                allItems = allItems.filter((s) => !isPetHomeScene(s) || sceneMatchesCheckinLocation(s, normalized));
+            let allItems;
+            if (strictDomesticCity || cityExclusivePool) {
+                allItems = mergedLocalPetHome.filter((s) => s && s.label && !obtainedLabels.has(s.label));
+            } else if (chinaNoLocal) {
+                allItems = [];
+            } else {
+                allItems = [...(pool.S || []), ...(pool.A || []), ...(pool.B || []), ...(pool.C || [])].filter(
+                    (s) => s && s.label && !obtainedLabels.has(s.label)
+                );
             }
-            available = allItems.filter((s) => s && s.label);
+            available = allItems;
         }
+
         if (available.length === 0) {
-            if (domesticScenePool.length > 0 && !Object.prototype.hasOwnProperty.call(LOCATION_COLLECTIBLE_POOLS, normalized)) {
+            const china = typeof isChinaLocation === 'function' && isChinaLocation(location);
+            if (domesticScenePool.length > 0 && !china) {
                 const pickedFallback = pickWeightedCollectibleFromPool(domesticScenePool, intent);
                 reportCollectDecisionDebug({
                     ...debugInfo,
@@ -6448,7 +6509,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 });
                 return pickedFallback;
             }
-            if (hiddenSceneAssets.length > 0) {
+            if (hiddenSceneAssets.length > 0 && !china) {
                 const pickedFallback = pickWeightedCollectibleFromPool(hiddenSceneAssets, intent);
                 reportCollectDecisionDebug({
                     ...debugInfo,

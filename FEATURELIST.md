@@ -68,9 +68,10 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 ### 文档范围（技术）
 
 - 主体：[`index.html`](index.html) 单页与直接依赖的 [`api/*.js`](api)。  
+- 收集物素材与清单：[`场景/`](场景/)（含 [`场景/generated/`](场景/generated/) 下 `pet-home-assets`、`aigc-cutouts`、`badges`、`exports` 等；详见下文「项目素材与清单」）。  
 - 硬件：[`bleConfig.js`](bleConfig.js)、[`esp32BleClient.js`](esp32BleClient.js)（与固件 GATT 对齐）。  
 - 静态资源：仓库根 [`soul.md`](soul.md) 与 `index.html` 一并部署到站点根（`GET /soul.md`），供「核心档案」与兜底 JSON。  
-- 技术重点：**RAG + 记忆** 的写入→检索→注入生成→可视化解释；**soul.md / 核心档案** 与生成链路分工；可选 **BLE 震动反馈**。
+- 技术重点：**RAG + 记忆** 的写入→检索→注入生成→可视化解释；**soul.md / 核心档案** 与生成链路分工；**旅行收集物（静态池 + manifest + 动态生图）**；可选 **BLE 震动反馈**。
 
 ## 产品概览（MVP 当前形态）
 
@@ -106,8 +107,10 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 | 记忆 | 打卡后异步 | **向量化写入（RAG store）** | `appState.debug.ragLastError` 可能更新 | **`POST /api/embed-and-store`** | **RAG 写入**（embedding→内存向量库） |
 | RAG | 生成日记时自动 | **向量检索召回 topK** | 不直接落前端状态（仅影响生成结果） | **`POST /api/retrieve`** | **RAG 召回**（embedding query → cosine topK）；query 在服务端由地点、性格、爱好及 **`semanticProfileSnapshot` 偏好词**、习惯摘要等拼接 |
 | RAG | 记忆面板（调试） | 查看向量记忆池总数/最近 N 条/地点分布 | 仅展示，不持久化 | **`GET /api/debug-memories`** | **RAG 可观测性**（验证写入是否成功） |
-| 橱柜 | 热点「橱柜」 | 打开橱柜弹窗（12 格） | `cabinetItems` 渲染；打开后清未读 | - | - |
-| 橱柜 | 打卡掉落 | 纪念品掉落 → Reward Modal | `cabinetItems` 增加；`cabinetHasNewUnseen=true` | - | 掉落可能绑定 `memoryTag`/`ragUnlockSource` |
+| 橱柜 | 热点「橱柜」 | 打开橱柜弹窗（容量 `CABINET_SLOTS`，当前 **100** 格） | `cabinetItems` 渲染；打开后清未读 | - | - |
+| 橱柜 | 打卡掉落 | 纪念品掉落 → Reward Modal | `cabinetItems` 增加；`cabinetHasNewUnseen=true`；**同一规范化地点仅首次打卡参与掉落**（`collectibleLocations`） | - | 掉落可能绑定 `memoryTag`/`ragUnlockSource`；静态池空时国内城依赖动态 API |
+| 收集物 | 页面加载 / 首次打卡前 | 合并徽章 manifest（多源） | 填充 `LOCATION_COLLECTIBLE_POOLS`、图鉴元数据、`soulgoGeneratedBadgeScenes` | 静态 `fetch`：`场景/generated/aigc-cutouts/manifest.json`、`场景/generated/badges/manifest.json`、`场景/generated/pet-home-assets/manifest.json` | 与 `poolKey` 同城 B 池绑定；部署须托管 `场景/generated/**` |
+| 收集物 | 打卡流程内 | **动态旅行贴纸 / 徽章**（概率或强制兜底） | 可能覆盖静态 `droppedScene`；写入 `cabinetItems` 同静态款 | **`POST /api/generate-collectible`** | 使用 `memoryTag`、人格 `collectionFocus` 与 RAG `ragUnlockSource` 推导的 `preferredCategory`（food/sculpture/souvenir） |
 | 橱柜 | 打卡时解析 | cabinetPlan 解锁物品/家具主题建议 | `lastFurnitureSuggestion` 写入；用于解释来源 | `POST /api/diary`（返回 `cabinetPlan`） | **RAG 参与“收藏/主题建议”**（生成侧输出） |
 | 家具 | 制作流程 | 制作纪念品遮罩（进度/提示） | 仅 UI 过渡；之后可能可摆放 | `POST /api/generate-furniture` | - |
 | 房间 | Reward Modal 选择 | 立即摆放/放入橱柜 | `placedFurniture` / `cabinetItems` 更新 | - | - |
@@ -168,7 +171,7 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
   - 支持插入本地图片（`<input type="file">`，图片存前端）
   - 支持 AIGC 生图展示与“导出图片”
 - **旅行见闻柜（橱柜）弹窗**
-  - 12 格橱柜（空位提示“去旅行解锁”）
+  - **100** 格橱柜（`CABINET_SLOTS`；空位提示“去旅行解锁”）
   - 新物品提示（获得后标记未读，用户打开橱柜后清除）
   - 橱柜记忆弹窗布局支持“分区 + 横向滑动卡片”（用于分层展示）
 - **获得新物品弹窗（Reward Modal）**
@@ -275,17 +278,94 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 
 ## 收集物 / 橱柜 / 家具（与记忆联动点）
 
-- **掉落与橱柜**
-  - 橱柜容量：12 格
-  - 新地点可触发掉落（含分 tier 的掉落逻辑与“新物品红点”）
-  - 掉落后弹出 Reward Modal，并写入橱柜数据
-- **RAG 参与“解锁来源”**
-  - `api/diary` 返回的 `cabinetPlan.unlockItems` / `furnitureSuggestions` 会在前端打卡流程中被提前抽取：
-    - 用作“本次掉落/解锁的解释来源”（`ragUnlockSource`）
-    - 用作“家具主题推荐”的持久化（`lastFurnitureSuggestion`）
-- **家具制作（生成资产）**
-  - `POST /api/generate-furniture`：根据地点/日记片段生成一张“单个家具资产”图（isometric 3D 风格）
-  - 前端有“制作中遮罩”承接过程，并支持“立即摆放”
+### 橱柜与展示
+
+- **容量**：`CABINET_SLOTS = 100`（`index.html`）；每件橱柜条目含 `location`、`scene`（图/label/tier/`collectCategory`/`memoryTag` 等）、可选 `ragUnlockSource`。
+- **未读红点**：获得新物品后 `cabinetHasNewUnseen`，打开橱柜后清除。
+- **照片墙**：从橱柜最近若干件以“拍立得”形式展示（环境叙事）。
+- **调试**：URL 加 `?collect_debug=1` 可在控制台查看最近一次加权抽样决策（`__lastCollectibleDecision`）；`?badge_lab=1` 可在 manifest 合并后打开全屏徽章候选网格。
+
+### 打卡 → 掉落主流程（逻辑摘要）
+
+1. **是否参与收集**：同一 **规范化地点** 若已在 `appState.collectibleLocations` 中，则 **本地点重复打卡不再掉落**（仍可写日记、写记忆）；新地点才走收集逻辑。
+2. **等待 manifest**：打卡前 `await ensureBadgeManifestLoaded()`，避免首屏竞态导致空池。
+3. **等级（tier）**：按「已成功解锁收集物的地点数」`collectibleLocations.length` 取序号，**`getForcedTierBySequence`** 使第 1～4 个**新地点**依次为 **C → B → A → S**，之后每 4 个循环一次。打卡流程**始终传入**该 `forcedTier`，`getDroppedScene` 会直接采用（代码中另保留按 `memoryScore` 随机 `rollTier` 的分支，仅当未传 `forcedTier` 时生效）。
+4. **记忆标签**：从 **日记正文 + 地点** 启发式推断 `inferMemoryTagFromContext`（如烤鸭→`beijing_snack`、星巴克→`starbucks` 等），并与最近一条情景记忆的 `memoryTag` 合并为 `effectiveTag`。
+5. **RAG / 橱柜计划信号**：日记 API 返回的 `cabinetPlan.unlockItems[0]` 转为 `ragUnlockSource`（`displayName` / `relatedLocation` / `itemId`），供 **收集意图** 与 Reward 文案引用；`furnitureSuggestions` 写入 `lastFurnitureSuggestion`。
+6. **静态池抽取**：`getDroppedScene`  
+   - **`poolKey`**：`normalizeLocationName` + 别名表（如潮汕→潮州）；  
+   - **同城 B 池**：`mergeLocalPetHomeBPool` = 该城在 `LOCATION_COLLECTIBLE_POOLS[poolKey].B` 中的 **pet-home 路径** 条目 ∪ `soulgoGeneratedBadgeScenes` 里同城扫描结果；  
+   - 若同城已有 manifest 徽章（`strictDomesticCity`），则 **S/A/B/C 均不再串到全球隐藏款 / NFC 通用池**，避免「打卡福州却掉巴黎铁塔」；  
+   - **未获得过**（按 `scene.label` 去重）过滤；可选 **memoryTag 优先**、**人格 `collectionFocus` + 类别软过滤**；候选上用 **`pickWeightedCollectibleFromPool`**（来源类型倍率、`memoryTag` 命中倍率、人格权重）；池空时按 tier 逐级 **fallback**，再不行合并 S/A/B/C 全池。
+7. **动态生成覆盖**：`tryGenerateDynamicCollectible` → **`POST /api/generate-collectible`**  
+   - 各 tier 有 **基础触发概率**（`COLLECTIBLE_POLICY.dynamicAigcChanceByTier`，C 档最高）；  
+   - 若静态结果为 null 且为国内地点，会 **强制再请求一次** API（`force: true`），避免 manifest 未部署时无掉落。  
+   - 成功则 **覆盖** 静态 `droppedScene`。
+8. **入账与弹窗**：橱柜未满、且 `findCabinetItem` 判定非重复 → `addCabinetItem`、地点记入 `collectibleLocations`、`showRewardModal`；BLE 震动仍按最终 `droppedScene.tier` 发送。
+
+### 静态池与 manifest 从哪来
+
+- **代码内嵌精选映射** [`index.html` 内 `sceneAssets`](index.html)：少量省市键（北京、广州/广东、上海、深圳、成都/四川、杭州/浙江）指向 **pet-home-assets** 下对应 PNG，并带完整 **图鉴文案**（`intro`/`facts`/`tags`）。
+- **运行时合并**（`loadGeneratedBadgeManifestAndMerge`），顺序加载：  
+  1. `场景/generated/aigc-cutouts/manifest.json`（动态管线落盘 + 元数据）；  
+  2. `场景/generated/badges/manifest.json`（兼容旧批量徽章清单）；  
+  3. **`场景/generated/pet-home-assets/manifest.json`（主清单）**：由 `output` 路径解析 `poolKey`（城市目录名），自动生成 `label`（`城市·地标`）、`collectCategory`（按关键词推断 food/sculpture/souvenir），并 **注册进 `LOCATION_COLLECTIBLE_POOLS[poolKey].B`**。  
+- **稀缺款注入**：`mergeOriginalRareScenes` 将「限定·麦当劳 / 限定·星巴克 / 限定·labubu」等并入 S/A 稀有候选（`场景_original` 素材，`assetSource: scene_original_rare`）。
+- **默认池结构**：`defaultPool` 的 S/A 多为 **NFC 预设** + **世界隐藏款**；B 默认空数组，靠 manifest 填充；C 为空（C 档依赖动态生成或流程降级，与历史「仅 AI 家具出 C」的叙述不同，以代码为准）。
+
+### `POST /api/generate-collectible`（[`api/generate-collectible.js`](api/generate-collectible.js)）
+
+- **依赖**：`OPENROUTER_API_KEY`；可选 `OPENROUTER_IMAGE_MODEL`（默认 `google/gemini-2.5-flash-image`）。  
+- **入参**：`location`（必填）、`tier`、`styleType` / `preferredCategory`（归一为 `food` | `sculpture` | `badge`）、`memoryTag`（作创意 hint，不落图内文字）。  
+- **出图**：白底手绘贴纸风；**禁止可读文字**（提示词层约束）；**Sharp** 抠白底近似透明 PNG。  
+- **可选落盘**：成功时写入 `场景/generated/aigc-cutouts/{styleType}/{poolKey}/` 并更新同目录 **`manifest.json`**（需服务端可写工作区；仅本地/可写部署有效）。返回 JSON 内 `scene` 带 `intro`/`facts`/`tags`、`collectCategory`、`collectibleSourceType: aigc_cutout_manifest` 等，供橱柜详情与合规文案（前端 `productizeAigcDetailMeta`）使用。
+
+### RAG 参与「解锁叙事」
+
+- `POST /api/diary` 返回的 `cabinetPlan.unlockItems` / `furnitureSuggestions` 在打卡流程早期解析：  
+  - **`ragUnlockSource`**：写入橱柜条目，并在 Reward / 详情中作为「与本次 AI 橱柜计划一致」的引用；  
+  - **`buildCollectibleIntent`**：把 `ragUnlockSource` 文本用正则映射到 **偏好收集类别**（吃食 / 地标 / 纪念徽章），影响加权抽样与动态生图 `preferredCategory`。
+
+### 家具（与收集物并列的摆放类）
+
+- **`POST /api/generate-furniture`**：根据地点/日记片段生成单件家具图（isometric 3D）；前端「制作中遮罩」承接，Reward 中可 **立即摆放** 或进橱柜（`type: 'furniture'` 条目与场景类区分）。
+
+---
+
+## 项目素材与清单（收集物相关）
+
+以下为当前仓库中 **实际存在或代码已引用** 的素材布局，便于部署核对与路演说明「内容从哪来」。
+
+### `场景/场景_original/`（手工 / 联名 / 隐藏款底图）
+
+| 类型 | 文件 | 用途（代码中） |
+|------|------|----------------|
+| NFC / S 档预设 | `星巴克.svg`、`麦当劳.svg`、`labubu.svg`、`四川—熊猫.png`（代码内标签为「兔子」） | `nfcPresetAssets`；另有「限定·*」稀缺副本走 `originalRareScenes` |
+| 隐藏款（非中国打卡） | `埃及金字塔.png`、`埃菲尔铁塔.png`、`自由女神像.png` | `hiddenSceneAssets`（A 档池） |
+| 早期城市插画（PNG） | `北京-糖葫芦.png`、`广州-早茶.png`、`上海—大白兔.png`、`深圳—簕杜鹃.png`、`四川—熊猫.png`、`浙江—雄黄酒.png` | README 说明的占位/扩展素材；当前主路径以 **pet-home 生成徽章** 为主 |
+
+### `场景/generated/pet-home-assets/`（全国城市场景徽章，主素材）
+
+- **`manifest.json`**：每条含 `source` / `output`（标准路径 `场景/generated/pet-home-assets/badges/<城市>/<文件>.png`）。当前仓库规模约为 **100 条记录、100 个城市目录**（随批次生成变化，以文件为准）。  
+- **`badges/<城市>/`**：该城可掉落的多枚 **透明底 PNG**（食物 / 地标 / 纪念风，与 `collectCategory` 推断一致）。  
+- **部署硬性要求**：站点必须能 `GET` 上述 manifest 及所有引用 PNG，否则国内同城静态池为空，只能依赖动态 API（或强制兜底失败时用户无贴纸）。
+
+### `场景/generated/aigc-cutouts/`（动态 API 或工具链产出）
+
+- 子目录 `food` / `sculpture` / `badge`（或 `manifest` 中 `styleType`）下按 `poolKey` 分文件夹存放抠图 PNG；根目录 **`manifest.json`** 登记后可被前端与 **静态池** 合并（与 pet-home 条目标签去重）。
+
+### `场景/generated/badges/`（兼容入口）
+
+- 旧版批量生成脚本的输出与 **`manifest.json`**；前端仍会尝试合并，路径会被规范到 `pet-home-assets` 形式（`toPetHomeAssetPath`）。
+
+### `场景/generated/exports/`（可选归档）
+
+- 用户从奖励弹窗 **导出 ZIP** 后，可用 `npm run ingest:checkin` 解压入库；详见 [`场景/README.md`](场景/README.md)。
+
+### 其他与「场景」相关的静态引用
+
+- **中国地图**：`index.html` 使用 Wikimedia `China_blank_province_map.svg`（失败时提示本地 `assets/map/china-kawaii-map.png` 备用）。  
+- **图鉴元数据合并**：`COLLECTIBLE_CATALOG_BY_LABEL` 合并内嵌 `sceneAssets`、`hiddenSceneAssets`、`nfcPresetAssets` 与 manifest 条目，橱柜 **详情页** 可补全 `intro`/`facts`/`tags`。
 
 ## AIGC 能力（除 RAG 外的生成）
 
@@ -294,6 +374,7 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 - **日记配图生成**：`POST /api/generate-image`
   - 前端在日记生成后异步触发
   - 成功后写入 `appState.diaryImages[diaryId]` 并支持导出
+- **旅行收集物贴纸（打卡动态兜底）**：`POST /api/generate-collectible`（OpenRouter 图像模型 + 服务端抠图；逻辑与素材目录见上文「收集物」与「项目素材与清单」）
 
 ## 本地存储与状态持久化
 
@@ -315,6 +396,7 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 - **`POST /api/retrieve`**：对 query embedding 后从向量记忆池 topK 召回（同上 Google Key）
 - **`GET /api/debug-memories`**：调试用：查看向量记忆池最近 N 条
 - **`POST /api/generate-image`**：生成日记配图
+- **`POST /api/generate-collectible`**：按地点/品类生成透明底旅行贴纸；依赖 **`OPENROUTER_API_KEY`**（及可选 `OPENROUTER_IMAGE_MODEL`）；可与 manifest 静态池互补或覆盖掉落结果
 - **`POST /api/generate-furniture`**：生成家具资产
 - **`POST /api/diary-image-comment`**：日记插图相关短评；使用 soul 短摘要 + 可选 `semanticProfileSnapshot`
 - **`POST /api/pet/decide`**：宠物自主行为意图（OpenRouter）；使用 soul 短摘要；前端通过 `window.PET_DECIDE_API_URL` 指向（默认 `/api/pet/decide`）

@@ -1798,6 +1798,47 @@
         .furniture-item.editing {
             outline: 2px dashed #ff8fab;
         }
+        .furniture-item.selected {
+            outline: 2px solid #ff8fab;
+            outline-offset: 2px;
+            z-index: 90 !important;
+            filter: drop-shadow(0 2px 8px rgba(255, 143, 171, 0.35));
+        }
+        #furniture-scale-toolbar {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(255, 202, 212, 0.9);
+            box-shadow: 0 4px 14px rgba(90, 60, 50, 0.12);
+            font-size: 11px;
+            font-weight: 800;
+            color: #5c4a3a;
+        }
+        #furniture-scale-toolbar.is-visible {
+            display: inline-flex;
+        }
+        #furniture-scale-toolbar button {
+            min-width: 2.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(200, 170, 150, 0.5);
+            background: linear-gradient(180deg, #fffefb, #fdf6f0);
+            color: #5c4a3a;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        #furniture-scale-toolbar button:active {
+            transform: scale(0.96);
+        }
+        #furniture-scale-toolbar .furniture-scale-label {
+            min-width: 2.75rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            color: #8d7f73;
+        }
         /* 简单的放置时的弹跳动画 */
         @keyframes popIn {
             0% { transform: translate(-50%, -100%) scale(0); opacity: 0; }
@@ -2567,6 +2608,13 @@
                         <!-- <div class="room-hotspot-debug-visual"></div> -->
                     </div>
                 </div>
+            </div>
+            <!-- 点选摆放物后：缩小 / 放大 / 完成（不随 room-scene 缩放，固定在视口底部） -->
+            <div id="furniture-scale-toolbar" class="absolute left-1/2 -translate-x-1/2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[60] pointer-events-auto" aria-hidden="true">
+                <button type="button" id="furniture-scale-shrink" aria-label="缩小">缩小</button>
+                <span id="furniture-scale-pct" class="furniture-scale-label">100%</span>
+                <button type="button" id="furniture-scale-grow" aria-label="放大">放大</button>
+                <button type="button" id="furniture-scale-done" class="!min-w-0 !px-2.5" aria-label="完成">完成</button>
             </div>
         </div>
 
@@ -12713,14 +12761,106 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         appState.placedFurniture = appState.placedFurniture || [];
         appState.placedFurniture.push(placement);
         renderFurnitureLayer();
+        setSelectedPlacedFurniture(placement.id);
         saveState();
         
         // 切换到房间视图
         document.getElementById('btn-back-petroom').click(); 
     }
 
+    const FURNITURE_BASE_WIDTH_PX = 80;
+    const FURNITURE_SCALE_MIN = 0.5;
+    const FURNITURE_SCALE_MAX = 2;
+    const FURNITURE_SCALE_STEP = 0.12;
+    const FURNITURE_DRAG_THRESHOLD_PX = 10;
+    let selectedPlacedFurnitureId = null;
+    let furnitureScaleUiBound = false;
+
+    function clampFurnitureScale(s) {
+        const n = Number(s);
+        if (!Number.isFinite(n)) return 1;
+        return Math.min(FURNITURE_SCALE_MAX, Math.max(FURNITURE_SCALE_MIN, n));
+    }
+
+    function normalizePlacedFurnitureScales() {
+        const list = appState.placedFurniture || [];
+        list.forEach((p) => {
+            let s = Number(p.scale);
+            if (!Number.isFinite(s) || s <= 0) p.scale = 1;
+            else p.scale = clampFurnitureScale(s);
+        });
+    }
+
+    function updateFurnitureScaleToolbar() {
+        const bar = document.getElementById('furniture-scale-toolbar');
+        const pctEl = document.getElementById('furniture-scale-pct');
+        if (!bar || !pctEl) return;
+        if (!selectedPlacedFurnitureId) {
+            bar.classList.remove('is-visible');
+            bar.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        const p = (appState.placedFurniture || []).find((x) => x.id === selectedPlacedFurnitureId);
+        if (!p) {
+            clearPlacedFurnitureSelection();
+            return;
+        }
+        bar.classList.add('is-visible');
+        bar.setAttribute('aria-hidden', 'false');
+        pctEl.textContent = Math.round((p.scale || 1) * 100) + '%';
+    }
+
+    function setSelectedPlacedFurniture(id) {
+        selectedPlacedFurnitureId = id || null;
+        document.querySelectorAll('.furniture-item').forEach((node) => {
+            node.classList.toggle('selected', !!id && node.id === id);
+        });
+        updateFurnitureScaleToolbar();
+    }
+
+    function clearPlacedFurnitureSelection() {
+        selectedPlacedFurnitureId = null;
+        document.querySelectorAll('.furniture-item').forEach((node) => node.classList.remove('selected'));
+        updateFurnitureScaleToolbar();
+    }
+
+    function adjustPlacedFurnitureScale(delta) {
+        if (!selectedPlacedFurnitureId) return;
+        const list = appState.placedFurniture || [];
+        const p = list.find((x) => x.id === selectedPlacedFurnitureId);
+        if (!p) {
+            clearPlacedFurnitureSelection();
+            return;
+        }
+        p.scale = clampFurnitureScale((Number(p.scale) || 1) + delta);
+        const el = document.getElementById(p.id);
+        if (el) el.style.width = (FURNITURE_BASE_WIDTH_PX * p.scale) + 'px';
+        updateFurnitureScaleToolbar();
+        saveState();
+    }
+
+    function onRoomViewportBackgroundPointerDown(e) {
+        if (!selectedPlacedFurnitureId) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('.furniture-item')) return;
+        if (t && t.closest && t.closest('#furniture-scale-toolbar')) return;
+        clearPlacedFurnitureSelection();
+    }
+
+    function ensureFurnitureScaleToolbarSetup() {
+        if (furnitureScaleUiBound) return;
+        furnitureScaleUiBound = true;
+        const rv = document.getElementById('room-viewport');
+        if (rv) rv.addEventListener('pointerdown', onRoomViewportBackgroundPointerDown);
+        document.getElementById('furniture-scale-shrink')?.addEventListener('click', () => adjustPlacedFurnitureScale(-FURNITURE_SCALE_STEP));
+        document.getElementById('furniture-scale-grow')?.addEventListener('click', () => adjustPlacedFurnitureScale(FURNITURE_SCALE_STEP));
+        document.getElementById('furniture-scale-done')?.addEventListener('click', () => clearPlacedFurnitureSelection());
+    }
+
     // 渲染房间内的家具层
     function renderFurnitureLayer() {
+        ensureFurnitureScaleToolbarSetup();
+        normalizePlacedFurnitureScales();
         const container = document.getElementById('furniture-layer');
         container.innerHTML = '';
         const list = appState.placedFurniture || [];
@@ -12731,112 +12871,132 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             el.id = p.id;
             el.style.left = p.x + '%';
             el.style.top = p.y + '%';
-            el.style.width = (80 * p.scale) + 'px'; // 基准宽度 80px
-            
-            // 去除 img 的背景，确保是透明的。生成的图片已经是白底，可以用 mix-blend-mode: multiply 简单去除白底，或者用 CSS 遮罩
-            // 为了更好的效果，我们可以尝试 mix-blend-mode: multiply (如果有底色是深色会有问题，但房间是浅色，应该还好)
-            // 或者，我们在生成端已经要求了 pure white background。
-            // 这里我们用 mix-blend-mode: multiply 配合一点亮度调整
+            el.style.width = (FURNITURE_BASE_WIDTH_PX * p.scale) + 'px';
+            if (selectedPlacedFurnitureId === p.id) el.classList.add('selected');
+
             const img = document.createElement('img');
             img.src = p.image;
-            // 强制添加 mix-blend-multiply 类，并内联样式确保生效
-            img.className = 'w-full h-auto drop-shadow-md pointer-events-none select-none mix-blend-multiply'; 
-            img.style.mixBlendMode = 'multiply'; // 强制生效
-            // 注意：mix-blend-multiply 会让白色变透明，但也会让图片变暗一点点。
-            // 更好的方式可能是 svg filter，但这里先用 multiply 试试，因为背景是浅黄/浅白。
-            
-            // 删除按钮（仅在选中/编辑时显示，这里简化为双击删除或长按菜单，暂略）
-            
+            img.className = 'w-full h-auto drop-shadow-md pointer-events-none select-none mix-blend-multiply';
+            img.style.mixBlendMode = 'multiply';
+
             el.appendChild(img);
             container.appendChild(el);
 
-            // 初始化拖拽
             initDraggable(el, p);
         });
+        updateFurnitureScaleToolbar();
     }
 
-    // 初始化拖拽逻辑 (Touch & Mouse)
+    // 拖拽：超过阈值才算拖动；轻点则选中并显示缩放条
     function initDraggable(el, data) {
-        let isDragging = false;
-        let startX, startY;
-        let startLeft, startTop;
-        const container = document.getElementById('furniture-layer'); // 参考容器：与 el 的定位基准一致
+        const container = document.getElementById('furniture-layer');
+        const th2 = FURNITURE_DRAG_THRESHOLD_PX * FURNITURE_DRAG_THRESHOLD_PX;
 
-        const onStart = (clientX, clientY) => {
-            isDragging = true;
+        function beginDrag(clientX, clientY, isDraggingRef) {
+            isDraggingRef.v = true;
             el.classList.add('editing');
-            startX = clientX;
-            startY = clientY;
-            
-            // 获取当前百分比位置转换为像素，以便计算 delta
+            isDraggingRef.startX = clientX;
+            isDraggingRef.startY = clientY;
             const rect = el.getBoundingClientRect();
             const parentRect = container.getBoundingClientRect();
-            startLeft = rect.left - parentRect.left;
-            startTop = rect.top - parentRect.top;
-            
-            // 阻止事件冒泡，避免触发背景拖动
-            // event.stopPropagation(); 
-        };
+            isDraggingRef.startLeft = rect.left - parentRect.left;
+            isDraggingRef.startTop = rect.top - parentRect.top;
+        }
 
-        const onMove = (clientX, clientY) => {
-            if (!isDragging) return;
-            const deltaX = clientX - startX;
-            const deltaY = clientY - startY;
-            
+        function doMove(clientX, clientY, isDraggingRef) {
+            const deltaX = clientX - isDraggingRef.startX;
+            const deltaY = clientY - isDraggingRef.startY;
             const parentRect = container.getBoundingClientRect();
-            
-            // 计算新位置（像素）
-            let newLeft = startLeft + deltaX;
-            let newTop = startTop + deltaY;
-            
-            // 转换为百分比
+            let newLeft = isDraggingRef.startLeft + deltaX;
+            let newTop = isDraggingRef.startTop + deltaY;
             let pctX = (newLeft / parentRect.width) * 100;
             let pctY = (newTop / parentRect.height) * 100;
-            
             el.style.left = pctX + '%';
             el.style.top = pctY + '%';
-            
-            // 更新数据
             data.x = pctX;
             data.y = pctY;
-        };
+        }
 
-        const onEnd = () => {
-            if (isDragging) {
-                isDragging = false;
-                el.classList.remove('editing');
-                saveState(); // 拖拽结束保存
-            }
-        };
-
-        // Mouse events
-        el.addEventListener('mousedown', e => { 
-            // 只有左键点击才触发
+        el.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
-            onStart(e.clientX, e.clientY); 
-            // e.stopPropagation(); // 暂时不阻止，看看是否影响
-        });
-        window.addEventListener('mousemove', e => { if(isDragging) { onMove(e.clientX, e.clientY); e.preventDefault(); } });
-        window.addEventListener('mouseup', onEnd);
+            e.stopPropagation();
+            const startX0 = e.clientX;
+            const startY0 = e.clientY;
+            const isDraggingRef = { v: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
+            let pointerDown = true;
 
-        // Touch events
-        el.addEventListener('touchstart', e => { 
-            if(e.touches.length === 1) {
-                onStart(e.touches[0].clientX, e.touches[0].clientY); 
-                e.stopPropagation(); // 阻止事件传给房间背景的缩放逻辑
+            function onMouseMove(ev) {
+                if (!pointerDown) return;
+                if (!isDraggingRef.v) {
+                    const dx = ev.clientX - startX0;
+                    const dy = ev.clientY - startY0;
+                    if (dx * dx + dy * dy >= th2) beginDrag(ev.clientX, ev.clientY, isDraggingRef);
+                }
+                if (isDraggingRef.v) {
+                    doMove(ev.clientX, ev.clientY, isDraggingRef);
+                    ev.preventDefault();
+                }
             }
-        }, { passive: false });
-        
-        window.addEventListener('touchmove', e => { 
-            if(isDragging && e.touches.length === 1) {
-                onMove(e.touches[0].clientX, e.touches[0].clientY); 
-                e.preventDefault(); // 阻止滚动
-                e.stopPropagation();
+
+            function onMouseUp() {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                if (!pointerDown) return;
+                pointerDown = false;
+                if (isDraggingRef.v) {
+                    el.classList.remove('editing');
+                    saveState();
+                } else {
+                    setSelectedPlacedFurniture(data.id);
+                }
+                isDraggingRef.v = false;
             }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+
+        el.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            e.stopPropagation();
+            const startX0 = e.touches[0].clientX;
+            const startY0 = e.touches[0].clientY;
+            const isDraggingRef = { v: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
+            let pointerDown = true;
+
+            function onTouchMove(ev) {
+                if (!pointerDown || ev.touches.length !== 1) return;
+                if (!isDraggingRef.v) {
+                    const dx = ev.touches[0].clientX - startX0;
+                    const dy = ev.touches[0].clientY - startY0;
+                    if (dx * dx + dy * dy >= th2) beginDrag(ev.touches[0].clientX, ev.touches[0].clientY, isDraggingRef);
+                }
+                if (isDraggingRef.v) {
+                    doMove(ev.touches[0].clientX, ev.touches[0].clientY, isDraggingRef);
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                }
+            }
+
+            function onTouchEnd() {
+                window.removeEventListener('touchmove', onTouchMove);
+                window.removeEventListener('touchend', onTouchEnd);
+                window.removeEventListener('touchcancel', onTouchEnd);
+                if (!pointerDown) return;
+                pointerDown = false;
+                if (isDraggingRef.v) {
+                    el.classList.remove('editing');
+                    saveState();
+                } else {
+                    setSelectedPlacedFurniture(data.id);
+                }
+                isDraggingRef.v = false;
+            }
+
+            window.addEventListener('touchmove', onTouchMove, { passive: false });
+            window.addEventListener('touchend', onTouchEnd);
+            window.addEventListener('touchcancel', onTouchEnd);
         }, { passive: false });
-        
-        window.addEventListener('touchend', onEnd);
-        window.addEventListener('touchcancel', onEnd);
     }
 
 

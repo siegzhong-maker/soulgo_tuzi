@@ -1,6 +1,8 @@
+import { randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
+import { putPublicObject } from '../lib/s3-public-object.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -177,6 +179,14 @@ function buildPersistPaths(styleType, location) {
   return { absFile, relImage, manifestPath, baseDir };
 }
 
+async function persistCollectibleToS3(cutoutPng, styleType, location) {
+  const poolKey = slug(location || 'misc');
+  const styleDir = slug(styleType || 'badge');
+  const fileName = `${poolKey}-${Date.now()}-${randomUUID().slice(0, 8)}.png`;
+  const key = `aigc-cutouts/${styleDir}/${poolKey}/${fileName}`;
+  return putPublicObject(key, cutoutPng, 'image/png');
+}
+
 function persistCollectibleAsset(cutoutPng, styleType, location, scene) {
   try {
     const { absFile, relImage, manifestPath, baseDir } = buildPersistPaths(styleType, location);
@@ -293,6 +303,12 @@ export async function POST(request) {
     if (persistedImage) {
       scene.image = persistedImage;
       scene.tags = Array.isArray(scene.tags) ? [...scene.tags, '已入库'] : ['已入库'];
+    } else {
+      const s3Url = await persistCollectibleToS3(cutout, styleType, location);
+      if (s3Url) {
+        scene.image = s3Url;
+        scene.tags = Array.isArray(scene.tags) ? [...scene.tags, '已入库'] : ['已入库'];
+      }
     }
     return Response.json({ ok: true, scene });
   } catch (err) {

@@ -1,11 +1,65 @@
-
 /**
  * Vercel Serverless Function: Generate furniture asset using OpenRouter API.
- * 
+ *
  * Input: { "location": "string", "diary_excerpt": "string", "city": "string" }
  * Output: { "image_url": "string", "item_name": "string", "assetSource": "ai_daily", "scarcity": "soft_capped", "source_location": "string" }
  */
+import { randomUUID } from 'crypto';
+import { putPublicObject } from '../lib/s3-public-object.js';
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+function slugLocationPart(input) {
+    return String(input || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 60) || 'misc';
+}
+
+function decodeModelImageToBuffer(imageUrl) {
+    const u = String(imageUrl || '');
+    const m = u.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (m) {
+        return { buffer: Buffer.from(m[2], 'base64'), mime: m[1].toLowerCase() };
+    }
+    return null;
+}
+
+function extFromMime(mime) {
+    const t = String(mime || '').toLowerCase();
+    if (t === 'image/jpeg') return 'jpg';
+    if (t === 'image/webp') return 'webp';
+    if (t === 'image/gif') return 'gif';
+    return 'png';
+}
+
+async function persistFurnitureImageToS3IfConfigured(imageUrl, location) {
+    const slug = slugLocationPart(location);
+    const stamp = `${Date.now()}_${randomUUID().slice(0, 8)}`;
+    let parsed = decodeModelImageToBuffer(imageUrl);
+    if (parsed) {
+        const key = `furniture/${slug}-${stamp}.${extFromMime(parsed.mime)}`;
+        const url = await putPublicObject(key, parsed.buffer, parsed.mime);
+        return url || String(imageUrl);
+    }
+    if (/^https?:\/\//i.test(String(imageUrl))) {
+        try {
+            const ir = await fetch(imageUrl);
+            if (!ir.ok) return String(imageUrl);
+            const buf = Buffer.from(await ir.arrayBuffer());
+            const ct = (ir.headers.get('content-type') || 'image/png').split(';')[0].trim().toLowerCase();
+            const mime = ct.startsWith('image/') ? ct : 'image/png';
+            const key = `furniture/${slug}-${stamp}.${extFromMime(mime)}`;
+            const url = await putPublicObject(key, buf, mime);
+            return url || String(imageUrl);
+        } catch {
+            return String(imageUrl);
+        }
+    }
+    return String(imageUrl);
+}
 
 export async function POST(request) {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -124,9 +178,11 @@ Design a single piece of furniture/decor item inspired by this location: "${loca
             );
         }
 
+        const stableImageUrl = await persistFurnitureImageToS3IfConfigured(imageUrl, location);
+
         return new Response(
             JSON.stringify({
-                image_url: imageUrl,
+                image_url: stableImageUrl,
                 item_name: itemName,
                 assetSource: 'ai_daily',
                 scarcity: 'soft_capped',

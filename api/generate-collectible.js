@@ -85,6 +85,8 @@ function extractImageUrl(data) {
     if (first?.url) return first.url;
     if (first?.imageUrl?.url) return first.imageUrl.url;
     if (first?.image_url?.url) return first.image_url.url;
+    if (typeof first?.image_url === 'string') return first.image_url;
+    if (first?.type === 'image_url' && first?.image_url?.url) return first.image_url.url;
     if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
   }
   if (Array.isArray(message.content)) {

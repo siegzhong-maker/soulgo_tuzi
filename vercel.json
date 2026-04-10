@@ -1,4 +1,15 @@
 {
+  "functions": {
+    "api/generate-collectible.js": {
+      "maxDuration": 60
+    },
+    "api/diary-image-job.js": {
+      "maxDuration": 60
+    },
+    "api/generate-image.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }

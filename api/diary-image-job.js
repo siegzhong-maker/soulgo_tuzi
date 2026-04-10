@@ -32,6 +32,8 @@ function extractImageUrl(data) {
     if (first?.url) return first.url;
     if (first?.imageUrl?.url) return first.imageUrl.url;
     if (first?.image_url?.url) return first.image_url.url;
+    if (typeof first?.image_url === 'string') return first.image_url;
+    if (first?.type === 'image_url' && first?.image_url?.url) return first.image_url.url;
     if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
   }
   if (Array.isArray(message.content)) {
@@ -139,7 +141,14 @@ export async function POST(request) {
     });
     if (!dataUrl) {
       recordDiaryImageEvent('load_error', { reason: 'store_input_unreachable', diaryId });
-      return Response.json({ error: 'input_unreachable' }, { status: 422 });
+      return Response.json(
+        {
+          error: 'input_unreachable',
+          message:
+            'Server could not fetch imageUrl (403/404/CORS). If this is your object storage URL, allow anonymous GetObject and match AWS_S3_PUBLIC_BASE_URL / R2_PUBLIC_BASE_URL.'
+        },
+        { status: 422 }
+      );
     }
     const persisted = await persistDiaryImageFromDataUrl(dataUrl, { diaryId, source, prefix: 'hero' });
     if (!persisted) {

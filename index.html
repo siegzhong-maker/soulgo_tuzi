@@ -5118,7 +5118,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         let usedFallback = false;
 
         try {
-            const res = await fetch('/api/npc/dialogue', {
+            const res = await fetch('/api/chat?soulgoRoute=npc/dialogue', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -2029,9 +2029,9 @@
             border-width: 2px;
             border-style: solid;
             border-color: #ff8fab;
-            /* 底部栏较扁，stretch 避免 cover 裁切后露出 PNG 透明边 */
-            background-size: 100% 100%;
-            background-position: center;
+            /* 底部栏较扁，不用贴图（避免 stretch/cover 变形），仅保留暖色纸底 */
+            background-image: none;
+            background-color: #faf3e8;
         }
         .diary-paper-frame__head {
             display: flex;

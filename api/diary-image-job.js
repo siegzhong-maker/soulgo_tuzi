@@ -164,12 +164,19 @@ export async function POST(request) {
   const referenceImageDataUrl = String(body?.reference_image_data_url || '').trim();
   const referenceImageUrl = String(body?.reference_image_url || '').trim();
 
-  const job = await createDiaryImageJob({
-    prompt,
-    diaryId,
-    reference_image_data_url: referenceImageDataUrl,
-    reference_image_url: referenceImageUrl
-  });
+  let job;
+  try {
+    job = await createDiaryImageJob({
+      prompt,
+      diaryId,
+      reference_image_data_url: referenceImageDataUrl,
+      reference_image_url: referenceImageUrl
+    });
+  } catch (e) {
+    const msg = String(e?.message || e || 'job_create_failed');
+    console.error('[diary-image-job] create failed:', msg);
+    return Response.json({ error: 'job_create_failed', message: msg }, { status: 500 });
+  }
   // Serverless runtimes are not reliable for fire-and-forget background work.
   // Run inline and return terminal status to avoid client-side poll timeouts.
   try {

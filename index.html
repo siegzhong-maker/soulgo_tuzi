@@ -286,6 +286,11 @@
             flex-direction: column;
             gap: 0.75rem;
         }
+        /* 详情页纸框不要被 flex 压缩，否则 overflow:hidden 会裁切后续气泡 */
+        #modal-panel[data-modal-variant="dialogue_history"][data-dialogue-subview="detail"] #modal-body .diary-paper-frame {
+            flex-shrink: 0;
+            overflow: visible;
+        }
         /* 见闻柜 / 详情：洛克式外框 + 羊皮纸内衬 */
         #modal-panel[data-modal-variant="cabinet"] {
             color: #3d2e24;
@@ -5228,8 +5233,27 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         ];
     }
 
+    function getValidNpcDialogueLines(rawLines) {
+        if (!Array.isArray(rawLines)) return [];
+        const lines = [];
+        for (const item of rawLines) {
+            if (!item || typeof item !== 'object') continue;
+            const speaker = String(item.speaker || '').trim();
+            const text = String(item.text || '').trim();
+            if (speaker !== '小粟' && speaker !== '比卡丘') continue;
+            if (!text) continue;
+            lines.push({
+                speaker,
+                text: text.length > 80 ? text.slice(0, 77) + '…' : text
+            });
+        }
+        return lines.slice(0, 12);
+    }
+
     function appendNpcDialogueHistory(entry) {
         if (!entry || !Array.isArray(entry.lines) || entry.lines.length === 0) return;
+        entry.lines = getValidNpcDialogueLines(entry.lines);
+        if (!entry.lines.length) return;
         if (!Array.isArray(appState.npcDialogueHistory)) appState.npcDialogueHistory = [];
         appState.npcDialogueHistory.push(entry);
         while (appState.npcDialogueHistory.length > NPC_DIALOGUE_HISTORY_MAX) {
@@ -5335,7 +5359,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             if (res.ok) {
                 const data = await res.json();
                 if (data && Array.isArray(data.dialogue) && data.dialogue.length > 0) {
-                    lines = data.dialogue;
+                    lines = getValidNpcDialogueLines(data.dialogue);
                     usedFallback = !!data.fallback;
                 }
             }
@@ -8812,7 +8836,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 '<p class="text-sm text-[#7a6b5a]">找不到这条对话记录。</p></div>'
             );
         }
-        const lines = Array.isArray(entry.lines) ? entry.lines : [];
+        const lines = getValidNpcDialogueLines(entry.lines);
         const loc = entry.location || '未知地点';
         const date = entry.date || '';
         const metaExtra = entry.fallback ? ' · 本地模板' : '';
@@ -8870,9 +8894,10 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             const key = entry.diaryId || String(entry.ts || '');
             const loc = entry.location || '未知地点';
             const date = entry.date || '';
-            const count = Array.isArray(entry.lines) ? entry.lines.length : 0;
-            const preview = (entry.lines && entry.lines[0] && entry.lines[0].text)
-                ? String(entry.lines[0].text).slice(0, 36)
+            const validLines = getValidNpcDialogueLines(entry.lines);
+            const count = validLines.length;
+            const preview = validLines[0] && validLines[0].text
+                ? String(validLines[0].text).slice(0, 36)
                 : '';
             return `
                 <button type="button" data-dialogue-history-key="${escapeHtml(key)}"

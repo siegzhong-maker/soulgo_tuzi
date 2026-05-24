@@ -270,6 +270,22 @@
         .modal-close-btn img {
             display: block;
         }
+        /* 旅行对话记录弹层 */
+        #modal-panel[data-modal-variant="dialogue_history"] #modal-title {
+            color: #5d4037;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+        #modal-panel[data-modal-variant="dialogue_history"] > div:first-of-type {
+            border-bottom: 1px solid rgba(141, 110, 99, 0.2);
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        #modal-panel[data-modal-variant="dialogue_history"] #modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
         /* 见闻柜 / 详情：洛克式外框 + 羊皮纸内衬 */
         #modal-panel[data-modal-variant="cabinet"] {
             color: #3d2e24;
@@ -1982,6 +1998,115 @@
             overflow-y: auto;
         }
 
+        /* 日记纸感外框（日记列表 / 对话栏 / 对话历史共用） */
+        .diary-paper-frame {
+            border-radius: 1rem;
+            padding: 1.5rem;
+            background-image: url('assets/UI/UI界面1-1.png');
+            background-size: cover;
+            background-position: center;
+            color: #5d4037;
+            box-shadow: 0 4px 14px rgba(93, 64, 55, 0.12);
+            border: 2px solid rgba(141, 110, 99, 0.22);
+        }
+        .diary-paper-frame--diary-list {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .diary-paper-frame--diary-list:hover {
+            transform: scale(1.01);
+        }
+        .diary-paper-frame--compact {
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(93, 64, 55, 0.1);
+            max-width: 42rem;
+            margin-left: auto;
+            margin-right: auto;
+            border-width: 2px;
+            border-style: solid;
+            border-color: #ff8fab;
+        }
+        .diary-paper-frame__head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(141, 110, 99, 0.2);
+        }
+        .diary-paper-frame__head--loose {
+            margin-bottom: 0.75rem;
+        }
+        .diary-paper-frame__chip {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #5d4037;
+            background: rgba(255, 250, 240, 0.85);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid rgba(141, 110, 99, 0.3);
+            line-height: 1.3;
+        }
+        .diary-paper-frame__chip--muted {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: #7a6b5a;
+        }
+        .diary-paper-frame__body {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.625rem;
+            min-width: 0;
+        }
+        .diary-paper-frame__body--stack {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .diary-paper-frame__text {
+            flex: 1;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.625;
+            word-break: break-word;
+            min-width: 0;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+        .diary-paper-avatar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            font-size: 1.25rem;
+            line-height: 1;
+            background: rgba(255, 250, 240, 0.92);
+            border-radius: 9999px;
+            border: 1px solid rgba(141, 110, 99, 0.35);
+            box-shadow: 0 2px 6px rgba(93, 64, 55, 0.08);
+        }
+        .diary-paper-avatar--sm {
+            width: 2rem;
+            height: 2rem;
+            font-size: 1rem;
+        }
+        #pet-dialog-speaker.pikachu-active .diary-paper-avatar {
+            border-color: rgba(212, 175, 55, 0.65);
+            box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.35);
+        }
+        .diary-paper-back-btn {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #d84315;
+            margin-bottom: 0.75rem;
+            padding: 0.15rem 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .diary-paper-back-btn:hover {
+            color: #bf360c;
+        }
         /* 底部固定对话栏：默认隐藏，通过 .visible 控制显隐 */
         #pet-dialog-bar {
             opacity: 0;
@@ -1991,8 +2116,9 @@
             opacity: 1;
             transform: translateY(0);
         }
-        #pet-dialog-speaker.pikachu-active {
+        #pet-dialog-speaker-name.pikachu-active {
             color: #b45309;
+            border-color: rgba(212, 175, 55, 0.5);
         }
         #npc-pikachu-room.npc-speaking {
             filter: drop-shadow(0 0 8px rgba(245, 200, 66, 0.85));
@@ -2002,13 +2128,48 @@
         }
         .npc-dialogue-history-item {
             cursor: pointer;
-            transition: background-color 0.15s ease;
+            width: 100%;
+            text-align: left;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
         .npc-dialogue-history-item:hover {
-            background-color: rgba(255, 250, 240, 0.95);
+            transform: scale(1.01);
+            box-shadow: 0 6px 18px rgba(93, 64, 55, 0.16);
+        }
+        .npc-dialogue-history-item:active {
+            transform: scale(0.995);
+        }
+        .npc-dialogue-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.5rem;
+            max-width: 100%;
+        }
+        .npc-dialogue-row--end {
+            flex-direction: row-reverse;
+            align-self: flex-end;
+        }
+        .npc-dialogue-row--start {
+            align-self: flex-start;
+        }
+        .npc-dialogue-row__content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            max-width: calc(100% - 2.75rem);
+            min-width: 0;
+        }
+        .npc-dialogue-row--end .npc-dialogue-row__content {
+            align-items: flex-end;
+        }
+        .npc-dialogue-speaker-label {
+            font-size: 0.625rem;
+            font-weight: 700;
+            color: #7a6b5a;
+            line-height: 1.2;
         }
         .npc-dialogue-bubble {
-            max-width: 88%;
+            max-width: 100%;
             padding: 0.5rem 0.75rem;
             border-radius: 1rem;
             font-size: 0.8125rem;
@@ -2016,16 +2177,20 @@
             word-break: break-word;
         }
         .npc-dialogue-bubble.xiaosu {
-            align-self: flex-start;
-            background: #fff5f0;
-            border: 1px solid #ff8fab;
-            color: #5c4033;
+            background: #fffaf0;
+            border: 1px solid rgba(141, 110, 99, 0.45);
+            color: #5d4037;
         }
         .npc-dialogue-bubble.pikachu {
-            align-self: flex-end;
             background: #fffbeb;
-            border: 1px solid #f5c842;
-            color: #78350f;
+            border: 1px solid rgba(212, 175, 55, 0.65);
+            color: #5d4037;
+        }
+        .npc-dialogue-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding-bottom: 0.25rem;
         }
 
         /* 旧房间内跟随气泡默认不展示，由底部对话栏替代 */
@@ -2810,14 +2975,19 @@
 
         <!-- 固定底部对话栏：用于展示小粟/比卡丘对话，不随房间拖拽/缩放移动 -->
         <div id="pet-dialog-bar" class="pointer-events-none opacity-0 transform transition-all duration-300 ease-out absolute left-4 right-4 bottom-24 z-40">
-            <div id="pet-dialog-bar-inner" class="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border-2 border-[#ff8fab] px-4 py-2 flex items-start gap-2 max-w-2xl mx-auto">
-                <div id="pet-dialog-speaker" class="flex flex-col items-center shrink-0 min-w-[2.5rem]">
-                    <span id="pet-dialog-speaker-icon" class="text-lg leading-none">🐰</span>
-                    <span id="pet-dialog-speaker-name" class="text-[10px] font-bold text-gray-500 mt-0.5">小粟</span>
+            <div id="pet-dialog-bar-inner" class="diary-paper-frame diary-paper-frame--compact">
+                <div class="diary-paper-frame__head">
+                    <span class="diary-paper-frame__chip diary-paper-frame__chip--muted">旅行对话</span>
+                    <span id="pet-dialog-speaker-name" class="diary-paper-frame__chip">小粟</span>
                 </div>
-                <p id="pet-dialog-text" class="flex-1 text-sm sm:text-base font-bold text-gray-700 leading-relaxed break-words min-w-0">
-                    正在期待下一次打卡… ✨
-                </p>
+                <div class="diary-paper-frame__body">
+                    <div id="pet-dialog-speaker" class="diary-paper-avatar" aria-hidden="true">
+                        <span id="pet-dialog-speaker-icon">🐰</span>
+                    </div>
+                    <p id="pet-dialog-text" class="diary-paper-frame__text sm:text-base">
+                        正在期待下一次打卡… ✨
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -4000,8 +4170,10 @@
                 const next = [];
                 for (let i = 0; i < arr.length; i++) {
                     const v = arr[i];
-                    if (isDiaryImageIdbRef(v)) {
-                        if (!(await idbBlobExistsForRef(v))) {
+                    const ref = typeof v === 'string' ? v : resolveDiaryImageStorageValue(v);
+                    if (isDiaryImageIdbRef(ref)) {
+                        if (!(await idbBlobExistsForRef(ref))) {
+                            setDiaryImageErrorReason(diaryId, i, 'idb_miss');
                             changed = true;
                             continue;
                         }
@@ -4998,8 +5170,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const cfg = isPikachu ? NPC_CONFIG.pikachu : (typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null);
         if (petDialogSpeakerIcon) petDialogSpeakerIcon.textContent = isPikachu ? '⚡' : (cfg && cfg.icon ? cfg.icon : '🐰');
         if (petDialogSpeakerName) petDialogSpeakerName.textContent = name;
-        if (petDialogSpeaker) {
-            petDialogSpeaker.classList.toggle('pikachu-active', isPikachu);
+        if (petDialogSpeakerName) {
+            petDialogSpeakerName.classList.toggle('pikachu-active', isPikachu);
         }
         const inner = petDialogBarInner || (petDialogBar ? petDialogBar.querySelector('#pet-dialog-bar-inner') : null);
         if (inner && cfg && cfg.bubbleColor) {
@@ -8607,29 +8779,50 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         if (!line || !line.text) return '';
         const isPikachu = line.speaker === '比卡丘';
         const cls = isPikachu ? 'pikachu' : 'xiaosu';
-        const label = isPikachu ? '⚡ 比卡丘' : '🌻 小粟';
+        const label = isPikachu ? '比卡丘' : '小粟';
+        const icon = isPikachu ? '⚡' : '🌻';
+        const rowCls = isPikachu ? 'npc-dialogue-row--end' : 'npc-dialogue-row--start';
         return `
-            <div class="flex flex-col gap-0.5 ${isPikachu ? 'items-end' : 'items-start'}">
-                <span class="text-[10px] font-bold text-gray-500">${escapeHtml(label)}</span>
-                <div class="npc-dialogue-bubble ${cls}">${escapeHtml(String(line.text))}</div>
+            <div class="npc-dialogue-row ${rowCls}">
+                <div class="diary-paper-avatar diary-paper-avatar--sm" aria-hidden="true">${icon}</div>
+                <div class="npc-dialogue-row__content">
+                    <span class="npc-dialogue-speaker-label">${escapeHtml(label)}</span>
+                    <div class="npc-dialogue-bubble ${cls}">${escapeHtml(String(line.text))}</div>
+                </div>
             </div>
         `;
     }
 
     function renderNpcDialogueHistoryDetailHtml(entry) {
-        if (!entry) return '<p class="text-sm text-gray-600">找不到这条对话记录。</p>';
+        if (!entry) {
+            return (
+                '<div class="diary-paper-frame p-4 text-center">' +
+                '<p class="text-sm text-[#7a6b5a]">找不到这条对话记录。</p></div>'
+            );
+        }
         const lines = Array.isArray(entry.lines) ? entry.lines : [];
         const loc = entry.location || '未知地点';
         const date = entry.date || '';
+        const metaExtra = entry.fallback ? ' · 本地模板' : '';
         const bubbles = lines.map(renderNpcDialogueBubbleLine).join('');
-        const backBtn = `<button type="button" class="text-xs font-bold text-[#ff8fab] mb-3" data-dialogue-history-back>← 返回列表</button>`;
+        const backBtn =
+            '<button type="button" class="diary-paper-back-btn" data-dialogue-history-back>← 返回列表</button>';
         return `
             ${backBtn}
-            <div class="mb-3">
-                <div class="text-sm font-bold text-gray-800">${escapeHtml(loc)}</div>
-                <div class="text-xs text-gray-500">${escapeHtml(date)} · ${lines.length} 轮对话${entry.fallback ? ' · 本地模板' : ''}</div>
+            <div class="diary-paper-frame">
+                <div class="diary-paper-frame__head diary-paper-frame__head--loose">
+                    <span class="diary-paper-frame__chip flex items-center gap-1 min-w-0">
+                        <i class="ph-fill ph-map-pin text-[#d84315] shrink-0"></i>
+                        <span class="truncate">${escapeHtml(loc)}</span>
+                    </span>
+                    <span class="diary-paper-frame__chip diary-paper-frame__chip--muted shrink-0">${escapeHtml(date)}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <span class="diary-paper-frame__chip diary-paper-frame__chip--muted">${lines.length} 轮对话${metaExtra}</span>
+                    <span class="text-sm leading-none" aria-hidden="true">🌻⚡</span>
+                </div>
+                <div class="npc-dialogue-thread">${bubbles}</div>
             </div>
-            <div class="flex flex-col gap-3 pb-2">${bubbles}</div>
         `;
     }
 
@@ -11630,6 +11823,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
     function diaryImageSrcHtmlAttrs(imageSrc) {
         const s = normalizePossiblyBareDiaryAssetUrl(String(imageSrc || ''));
+        if (!s) return '';
         if (isDiaryImageIdbRef(s)) {
             return (
                 ' src="' +
@@ -11639,8 +11833,17 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 '"'
             );
         }
-        return ' src="' + s.replace(/"/g, '&quot;') + '"';
+        return (
+            ' src="' +
+            s.replace(/"/g, '&quot;') +
+            '" onerror="handleDiaryHeroImgError(this)"'
+        );
     }
+
+    /** 日记纸感外框（列表 / 对话栏 / 对话历史共用） */
+    const DIARY_PAPER_FRAME_CLASS =
+        'diary-paper-frame diary-paper-frame--diary-list shadow-md animate-[fadeIn_0.5s_ease-out]';
+    const DIARY_PAPER_FRAME_COMPACT_CLASS = 'diary-paper-frame diary-paper-frame--compact';
 
     /** 日记 AIGC 配图区：loading / 成图 / 失败共用外框，避免布局跳动 */
     const DIARY_AIGC_MEDIA_FRAME_CLASS =
@@ -11696,6 +11899,9 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const safeLoc = escapeHtml(String(location || ''));
         const srcAttrs = diaryImageSrcHtmlAttrs(imageSrc);
         const id = escapeHtml(String(diaryId));
+        if (!srcAttrs) {
+            return buildDiaryAigcMissingHeroInnerHTML(diaryId, location);
+        }
         if (!includeSoul) {
             return (
                 '<div class="flex flex-col gap-2 w-full">' +
@@ -12593,7 +12799,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const rewardBonusChip = buildDiaryRewardBonusChipHTML(diaryId, rewardDisplay.bonus);
 
         const diaryHTML = `
-            <div class="rounded-2xl p-6 transform transition-all hover:scale-[1.01] shadow-md animate-[fadeIn_0.5s_ease-out] bg-[url('assets/UI/UI界面1-1.png')] bg-cover bg-center text-[#5d4037]" data-diary-id="${diaryId}" style="min-height: 140px;">
+            <div class="${DIARY_PAPER_FRAME_CLASS}" data-diary-id="${diaryId}" style="min-height: 140px;">
                 <div class="flex justify-between items-center mb-3 border-b border-[#8d6e63]/20 pb-2">
                     <span class="text-xs font-bold text-[#5d4037] bg-[#fffaf0]/80 px-2 py-1 rounded-md border border-[#8d6e63]/30">${date}</span>
                     <span class="text-xs text-[#5d4037] font-bold flex items-center gap-1"><i class="ph-fill ph-map-pin text-[#d84315]"></i> ${location}</span>
@@ -12714,6 +12920,105 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         }
     }
 
+    /** 将 job/API 返回的 URL 或 data URL 压进 IndexedDB，避免 S3 403 或 localStorage 裁剪后主图丢失 */
+    async function materializeDiaryHeroImageForStorage(rawUrl, diaryId, slotIndex) {
+        const url = normalizePossiblyBareDiaryAssetUrl(String(rawUrl || '').trim());
+        if (!url) return null;
+
+        let dataUrl = '';
+        if (url.startsWith('data:image/')) {
+            dataUrl = url;
+        } else if (!isDiaryImageIdbRef(url)) {
+            try {
+                const fetchTarget = url.startsWith('/') ? new URL(url, window.location.href).href : url;
+                const r = await fetch(fetchTarget);
+                if (r.ok) {
+                    const blob = await r.blob();
+                    dataUrl = await new Promise((resolve, reject) => {
+                        const fr = new FileReader();
+                        fr.onload = () => resolve(String(fr.result || ''));
+                        fr.onerror = () => reject(fr.error);
+                        fr.readAsDataURL(blob);
+                    });
+                }
+            } catch (err) {
+                console.warn('[AIGC Image] Could not fetch diary hero bytes for IDB:', err);
+            }
+        }
+
+        if (dataUrl && dataUrl.startsWith('data:image/')) {
+            const compressed = await compressDiaryImageDataUrl(dataUrl);
+            let storageVal = compressed;
+            let displayUrl = compressed;
+            try {
+                storageVal = await idbPutDiaryBlob(String(diaryId), slotIndex, compressed);
+                displayUrl = await idbGetDiaryBlobUrl(storageVal);
+            } catch (idbErr) {
+                console.warn('[AIGC Image] IndexedDB store failed, using compressed data URL:', idbErr);
+            }
+            const idbBacked = isDiaryImageIdbRef(storageVal);
+            return {
+                storageVal,
+                displayUrl: idbBacked ? displayUrl : storageVal,
+                imageEntry: {
+                    storage: storageVal,
+                    display: storageVal,
+                    stableUrl: /^https?:\/\//i.test(url) ? url : '',
+                    sourceType: idbBacked ? 'idb' : 'data',
+                    assetId: '',
+                    transient: !idbBacked
+                }
+            };
+        }
+
+        if (isDiaryImageIdbRef(url)) {
+            let displayUrl = url;
+            try {
+                displayUrl = (await idbGetDiaryBlobUrl(url)) || url;
+            } catch (_) { /* keep ref */ }
+            return {
+                storageVal: url,
+                displayUrl,
+                imageEntry: {
+                    storage: url,
+                    display: url,
+                    stableUrl: '',
+                    sourceType: 'idb',
+                    assetId: '',
+                    transient: false
+                }
+            };
+        }
+
+        if (/^https?:\/\//i.test(url) || url.startsWith('/')) {
+            return {
+                storageVal: url,
+                displayUrl: url,
+                imageEntry: {
+                    storage: url,
+                    display: url,
+                    stableUrl: url,
+                    sourceType: 'stable_asset',
+                    assetId: '',
+                    transient: false
+                }
+            };
+        }
+
+        return null;
+    }
+
+    function handleDiaryHeroImgError(imgEl) {
+        if (!imgEl) return;
+        const wrap = imgEl.closest('.diary-aigc-image');
+        if (!wrap || wrap.querySelector('.diary-retry-aigc')) return;
+        const diaryId = wrap.getAttribute('data-diary-id') || '';
+        const loc =
+            (typeof getDiaryLocationForDiaryImage === 'function' ? getDiaryLocationForDiaryImage(diaryId) : '') || '';
+        setDiaryImageErrorReason(diaryId, 0, 'expired_url');
+        wrap.innerHTML = buildDiaryAigcMissingHeroInnerHTML(diaryId, loc);
+    }
+
     async function generateImageForDiary(diaryId, location, personality, diarySummary) {
         const idEsc = String(diaryId);
         diaryAigcPendingIds.add(idEsc);
@@ -12795,11 +13100,12 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
                 if (!appState.diaryImages) appState.diaryImages = {};
                 if (!appState.diaryImages[idEsc]) appState.diaryImages[idEsc] = [];
+                const slotForHero = appState.diaryImages[idEsc].length;
+
                 const isInlineDataUrl = displayUrl.startsWith('data:image/');
                 const jobResultSource = statusPayload.result && statusPayload.result.source
                     ? String(statusPayload.result.source)
                     : '';
-                // runJob 内已 put 到对象存储时不必再调 store：服务端二次 fetch 同源 URL，在 bucket 未公开读时会 403→toDataUrl 失败→422，与控制台一致
                 const alreadyPersistedRemote =
                     jobResultSource === 'stable_asset' && /^https?:\/\//i.test(displayUrl);
                 let imageEntry = {
@@ -12810,7 +13116,6 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     assetId: String(statusPayload.result.assetId || ''),
                     transient: isInlineDataUrl
                 };
-                // 已是内联 data URL 时无需再 store；已在 Job 写入公网 URL 的也不必重复 store
                 if (!isInlineDataUrl && !alreadyPersistedRemote) {
                     try {
                         const storeRes = await persistDiaryImageViaStoreApi(idEsc, displayUrl);
@@ -12824,18 +13129,37 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                                 imageEntry.sourceType = su.startsWith('data:image/') ? 'data' : 'stable_asset';
                                 imageEntry.transient = su.startsWith('data:image/');
                                 imageEntry.assetId = String(storeData.assetId || imageEntry.assetId || '');
+                                displayUrl = su;
                             }
                         }
                     } catch (storeErr) {
                         console.warn('[AIGC Image] diary-image-store failed, keep stable url from job:', storeErr);
                     }
                 }
-                storageVal = imageEntry.storage;
-                displayUrl = imageEntry.display;
+
+                const materialized = await materializeDiaryHeroImageForStorage(
+                    imageEntry.storage || displayUrl,
+                    idEsc,
+                    slotForHero
+                );
+                if (materialized && materialized.imageEntry) {
+                    imageEntry = {
+                        ...materialized.imageEntry,
+                        assetId: String(statusPayload.result.assetId || materialized.imageEntry.assetId || '')
+                    };
+                    storageVal = materialized.storageVal;
+                    displayUrl = materialized.displayUrl;
+                } else if (!displayUrl) {
+                    throw new Error('image_fetch_failed');
+                } else {
+                    storageVal = imageEntry.storage;
+                }
+
                 setDiaryImageErrorReason(idEsc, 0, '');
 
                 const successHTML = buildAigcBlockWithSoulHTML(diaryId, location, displayUrl, { includeSoulComment: false });
                 applyToAll(successHTML);
+                void hydrateDiaryImagesInRoot(document);
 
                 const existed = appState.diaryImages[idEsc].some((it) => resolveDiaryImageStorageValue(it) === storageVal);
                 if (!existed) {
@@ -14516,7 +14840,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 : (showMissingHeroStrip ? buildDiaryAigcMissingHeroInnerHTML(diaryId, location) : '');
 
             const diaryHTML = `
-            <div class="rounded-2xl p-6 transform transition-all hover:scale-[1.01] shadow-md animate-[fadeIn_0.5s_ease-out] bg-[url('assets/UI/UI界面1-1.png')] bg-cover bg-center text-[#5d4037]" data-diary-id="${escapeHtml(diaryId)}" style="min-height: 140px;">
+            <div class="${DIARY_PAPER_FRAME_CLASS}" data-diary-id="${escapeHtml(diaryId)}" style="min-height: 140px;">
                 <div class="flex justify-between items-center mb-3 border-b border-[#8d6e63]/20 pb-2">
                     <span class="text-xs font-bold text-[#5d4037] bg-[#fffaf0]/80 px-2 py-1 rounded-md border border-[#8d6e63]/30">${escapeHtml(date)}</span>
                     <span class="text-xs text-[#5d4037] font-bold flex items-center gap-1"><i class="ph-fill ph-map-pin text-[#d84315]"></i> ${escapeHtml(location)}</span>

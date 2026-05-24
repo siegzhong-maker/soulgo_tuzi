@@ -98,13 +98,20 @@ async function runJob(job, request) {
       const isRetry = i > 1;
       recordDiaryImageEvent(isRetry ? 'retry_success' : 'gen_success', { diaryId: String(job.diaryId || '') });
       const inline = String(persisted.stableUrl || '').startsWith('data:image/');
+      const result = {
+        ...persisted,
+        image_url: persisted.stableUrl,
+        source: inline ? 'inline_dataurl' : 'stable_asset'
+      };
+      // When persisted to private S3/R2, browsers often cannot GET the public URL (403/CORS).
+      // Ship the same bytes inline so the client can store in IndexedDB without refetching the bucket.
+      const maxInline = 2.5 * 1024 * 1024;
+      if (!inline && dataUrl.startsWith('data:image/') && dataUrl.length <= maxInline) {
+        result.image_url_inline = dataUrl;
+      }
       await updateDiaryImageJob(job.id, {
         status: 'ready',
-        result: {
-          ...persisted,
-          image_url: persisted.stableUrl,
-          source: inline ? 'inline_dataurl' : 'stable_asset'
-        }
+        result
       });
       return;
     } catch (err) {

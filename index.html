@@ -13017,19 +13017,44 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             };
         }
 
-        if (/^https?:\/\//i.test(url) || url.startsWith('/')) {
-            return {
-                storageVal: url,
-                displayUrl: url,
-                imageEntry: {
-                    storage: url,
-                    display: url,
-                    stableUrl: url,
-                    sourceType: 'stable_asset',
-                    assetId: '',
-                    transient: false
+        return null;
+    }
+
+    /** 将 job 返回的 URL / inline 数据落到 IndexedDB；远程图拉不到字节时不返回「仅 URL」占位 */
+    async function ensureDiaryHeroImageMaterialized(rawUrl, diaryId, slotIndex, options) {
+        const opts = options || {};
+        const tryUrls = [];
+        if (opts.inlineDataUrl && String(opts.inlineDataUrl).startsWith('data:image/')) {
+            tryUrls.push(String(opts.inlineDataUrl));
+        }
+        const primary = normalizePossiblyBareDiaryAssetUrl(String(rawUrl || '').trim());
+        if (primary) tryUrls.push(primary);
+
+        for (const u of tryUrls) {
+            const m = await materializeDiaryHeroImageForStorage(u, diaryId, slotIndex);
+            if (m && m.imageEntry) return m;
+        }
+
+        const remote = primary && /^https?:\/\//i.test(primary) ? primary : '';
+        if (remote) {
+            try {
+                const storeRes = await persistDiaryImageViaStoreApi(diaryId, remote);
+                if (storeRes.ok) {
+                    const storeData = await storeRes.json().catch(() => ({}));
+                    const su = storeData && storeData.stableUrl ? String(storeData.stableUrl) : '';
+                    if (su) {
+                        const m = await materializeDiaryHeroImageForStorage(su, diaryId, slotIndex);
+                        if (m && m.imageEntry) return m;
+                    }
                 }
-            };
+            } catch (storeErr) {
+                console.warn('[AIGC Image] store API materialize failed:', storeErr);
+            }
+            const asData = await diaryFetchImageAsDataUrl(remote);
+            if (asData && asData.startsWith('data:image/')) {
+                const m = await materializeDiaryHeroImageForStorage(asData, diaryId, slotIndex);
+                if (m && m.imageEntry) return m;
+            }
         }
 
         return null;
@@ -13042,7 +13067,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const diaryId = wrap.getAttribute('data-diary-id') || '';
         const loc =
             (typeof getDiaryLocationForDiaryImage === 'function' ? getDiaryLocationForDiaryImage(diaryId) : '') || '';
-        setDiaryImageErrorReason(diaryId, 0, 'expired_url');
+        setDiaryImageErrorReason(diaryId, 0, 'input_unreachable');
         wrap.innerHTML = buildDiaryAigcMissingHeroInnerHTML(diaryId, loc);
     }
 
@@ -13129,57 +13154,38 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 if (!appState.diaryImages[idEsc]) appState.diaryImages[idEsc] = [];
                 const slotForHero = appState.diaryImages[idEsc].length;
 
-                const isInlineDataUrl = displayUrl.startsWith('data:image/');
-                const jobResultSource = statusPayload.result && statusPayload.result.source
-                    ? String(statusPayload.result.source)
-                    : '';
-                const alreadyPersistedRemote =
-                    jobResultSource === 'stable_asset' && /^https?:\/\//i.test(displayUrl);
-                let imageEntry = {
-                    storage: storageVal,
-                    display: displayUrl,
-                    stableUrl: displayUrl,
-                    sourceType: isInlineDataUrl ? 'data' : 'stable_asset',
-                    assetId: String(statusPayload.result.assetId || ''),
-                    transient: isInlineDataUrl
-                };
-                if (!isInlineDataUrl && !alreadyPersistedRemote) {
-                    try {
-                        const storeRes = await persistDiaryImageViaStoreApi(idEsc, displayUrl);
-                        if (storeRes.ok) {
-                            const storeData = await storeRes.json().catch(() => ({}));
-                            if (storeData && storeData.stableUrl) {
-                                const su = String(storeData.stableUrl);
-                                imageEntry.storage = su;
-                                imageEntry.display = su;
-                                imageEntry.stableUrl = su;
-                                imageEntry.sourceType = su.startsWith('data:image/') ? 'data' : 'stable_asset';
-                                imageEntry.transient = su.startsWith('data:image/');
-                                imageEntry.assetId = String(storeData.assetId || imageEntry.assetId || '');
-                                displayUrl = su;
-                            }
-                        }
-                    } catch (storeErr) {
-                        console.warn('[AIGC Image] diary-image-store failed, keep stable url from job:', storeErr);
-                    }
-                }
+                const inlineFromJob =
+                    statusPayload.result && typeof statusPayload.result.image_url_inline === 'string'
+                        ? statusPayload.result.image_url_inline
+                        : '';
+                const remoteStableUrl =
+                    displayUrl.startsWith('data:image/') ? '' : displayUrl;
 
-                const materialized = await materializeDiaryHeroImageForStorage(
-                    imageEntry.storage || displayUrl,
+                let imageEntry = {
+                    storage: displayUrl,
+                    display: displayUrl,
+                    stableUrl: remoteStableUrl || displayUrl,
+                    sourceType: displayUrl.startsWith('data:image/') ? 'data' : 'stable_asset',
+                    assetId: String(statusPayload.result.assetId || ''),
+                    transient: displayUrl.startsWith('data:image/')
+                };
+
+                const materialized = await ensureDiaryHeroImageMaterialized(
+                    remoteStableUrl || displayUrl,
                     idEsc,
-                    slotForHero
+                    slotForHero,
+                    { inlineDataUrl: inlineFromJob || (displayUrl.startsWith('data:image/') ? displayUrl : '') }
                 );
                 if (materialized && materialized.imageEntry) {
                     imageEntry = {
                         ...materialized.imageEntry,
-                        assetId: String(statusPayload.result.assetId || materialized.imageEntry.assetId || '')
+                        assetId: String(statusPayload.result.assetId || materialized.imageEntry.assetId || ''),
+                        stableUrl: remoteStableUrl || materialized.imageEntry.stableUrl || ''
                     };
                     storageVal = materialized.storageVal;
                     displayUrl = materialized.displayUrl;
-                } else if (!displayUrl) {
-                    throw new Error('image_fetch_failed');
                 } else {
-                    storageVal = imageEntry.storage;
+                    throw new Error('input_unreachable');
                 }
 
                 setDiaryImageErrorReason(idEsc, 0, '');

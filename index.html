@@ -1991,6 +1991,42 @@
             opacity: 1;
             transform: translateY(0);
         }
+        #pet-dialog-speaker.pikachu-active {
+            color: #b45309;
+        }
+        #npc-pikachu-room.npc-speaking {
+            filter: drop-shadow(0 0 8px rgba(245, 200, 66, 0.85));
+        }
+        #pet-avatar-room.pet-speaking {
+            filter: drop-shadow(0 0 8px rgba(255, 143, 171, 0.75));
+        }
+        .npc-dialogue-history-item {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .npc-dialogue-history-item:hover {
+            background-color: rgba(255, 250, 240, 0.95);
+        }
+        .npc-dialogue-bubble {
+            max-width: 88%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8125rem;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .npc-dialogue-bubble.xiaosu {
+            align-self: flex-start;
+            background: #fff5f0;
+            border: 1px solid #ff8fab;
+            color: #5c4033;
+        }
+        .npc-dialogue-bubble.pikachu {
+            align-self: flex-end;
+            background: #fffbeb;
+            border: 1px solid #f5c842;
+            color: #78350f;
+        }
 
         /* 旧房间内跟随气泡默认不展示，由底部对话栏替代 */
         #pet-action-bubble,
@@ -2641,6 +2677,11 @@
                 <div id="pet-avatar-room" class="absolute bottom-[20%] left-[60%] drop-shadow-2xl z-40 pet-breathe pet-can-move cursor-pointer pointer-events-auto" style="transform: translateX(-50%);">
                     <img id="pet-avatar-sprite" src="比卡丘动画导出/tuzi.png" alt="旅行宠物" data-fallback="场景/兔子.svg" class="w-24 h-24 object-contain pointer-events-none select-none" onerror="var f=this.getAttribute('data-fallback');if(f){this.onerror=null;this.src=f;}">
                 </div>
+
+                <!-- 比卡丘 NPC（定点展示，不参与 petWalk） -->
+                <div id="npc-pikachu-room" class="absolute bottom-[20%] left-[32%] drop-shadow-2xl z-40 pet-breathe pointer-events-none" style="transform: translateX(-50%);">
+                    <img id="npc-pikachu-sprite" src="比卡丘动画导出/呼吸演示.gif" alt="比卡丘" data-fallback="比卡丘动画导出/tuzi.png" class="w-24 h-24 object-contain pointer-events-none select-none" onerror="var f=this.getAttribute('data-fallback');if(f){this.onerror=null;this.src=f;}">
+                </div>
                 
                 <!-- 互动气泡 -->
                 <div id="pet-action-bubble" class="absolute bottom-[48%] left-[50%] bubble-float bg-white/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-xl text-sm font-bold text-gray-700 whitespace-nowrap z-50 border-2 border-[#ff8fab] transition-all duration-300 pointer-events-none opacity-0" style="transform: translateX(-50%);">
@@ -2723,6 +2764,18 @@
                             <span>小锅</span>
                         </div>
                     </button>
+                    <!-- 对话历史：查看小粟与比卡丘的打卡后讨论 -->
+                    <button
+                        type="button"
+                        id="hotspot-dialogue-history"
+                        class="room-hotspot room-hotspot-highlight pointer-events-auto"
+                        aria-label="查看旅行对话历史"
+                    >
+                        <div class="room-hotspot-button">
+                            <span>💬</span>
+                            <span>对话</span>
+                        </div>
+                    </button>
                     <!-- 音乐盒：点击选择 BGM -->
                     <button
                         type="button"
@@ -2755,11 +2808,14 @@
             </div>
         </div>
 
-        <!-- 固定底部对话栏：用于展示比卡丘当前对话，不随房间拖拽/缩放移动 -->
+        <!-- 固定底部对话栏：用于展示小粟/比卡丘对话，不随房间拖拽/缩放移动 -->
         <div id="pet-dialog-bar" class="pointer-events-none opacity-0 transform transition-all duration-300 ease-out absolute left-4 right-4 bottom-24 z-40">
-            <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border-2 border-[#ff8fab] px-4 py-2 flex items-start gap-2 max-w-2xl mx-auto">
-                <div class="text-lg leading-none mt-0.5">💬</div>
-                <p id="pet-dialog-text" class="text-sm sm:text-base font-bold text-gray-700 leading-relaxed break-words">
+            <div id="pet-dialog-bar-inner" class="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border-2 border-[#ff8fab] px-4 py-2 flex items-start gap-2 max-w-2xl mx-auto">
+                <div id="pet-dialog-speaker" class="flex flex-col items-center shrink-0 min-w-[2.5rem]">
+                    <span id="pet-dialog-speaker-icon" class="text-lg leading-none">🐰</span>
+                    <span id="pet-dialog-speaker-name" class="text-[10px] font-bold text-gray-500 mt-0.5">小粟</span>
+                </div>
+                <p id="pet-dialog-text" class="flex-1 text-sm sm:text-base font-bold text-gray-700 leading-relaxed break-words min-w-0">
                     正在期待下一次打卡… ✨
                 </p>
             </div>
@@ -2936,6 +2992,8 @@
         placedFurniture: [],       // { id, itemId, x, y, scale, rotation } 已摆放家具
         // 最近一次打卡用于返回宠物房时的聚焦动画与对话
         lastCheckinHighlight: null,
+        // 打卡后小粟与比卡丘的 LLM 双人对话历史
+        npcDialogueHistory: [],
         // 橱柜是否有未读新物品（获得新物品后为 true，用户打开橱柜后置 false）
         cabinetHasNewUnseen: false,
         // 调试：最近一次 RAG 写入错误（embed-and-store），仅用于 AI 记忆池面板提示
@@ -3837,6 +3895,9 @@
                     } else if (typeof appState.flags.partnerWhiteRabbitShanghai !== 'boolean') {
                         appState.flags.partnerWhiteRabbitShanghai = false;
                     }
+                    if (!Array.isArray(appState.npcDialogueHistory)) {
+                        appState.npcDialogueHistory = [];
+                    }
                     migrateEpisodicStripBlobImageUrls();
                     void (async () => {
                         await migrateCabinetItemImagesToIdb();
@@ -4305,6 +4366,28 @@
             ]
         }
     };
+
+    const NPC_CONFIG = {
+        pikachu: {
+            id: 'pikachu',
+            displayName: '比卡丘',
+            icon: '⚡',
+            bubbleColor: '#f5c842',
+            defaultPosition: { left: '32%', bottom: '20%' },
+            animationMap: {
+                idle_wait: '比卡丘动画导出/等待演示.gif',
+                idle_breath: '比卡丘动画导出/呼吸演示.gif',
+                idle_observe: '比卡丘动画导出/观察演示.gif',
+                interact: '比卡丘动画导出/互动演示.gif',
+                rest: '比卡丘动画导出/休息演示.gif',
+                eat: '比卡丘动画导出/吃演示.gif',
+                touch: '比卡丘动画导出/摸演示.gif',
+                plant: '比卡丘动画导出/观察演示.gif'
+            }
+        }
+    };
+
+    const NPC_DIALOGUE_HISTORY_MAX = 30;
     
     // 获取当前人格配置
     function getCurrentPersonality() {
@@ -4599,6 +4682,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     
     const petAvatarRoom = document.getElementById('pet-avatar-room');
     const petAvatarSprite = document.getElementById('pet-avatar-sprite');
+    const npcPikachuRoom = document.getElementById('npc-pikachu-room');
+    const npcPikachuSprite = document.getElementById('npc-pikachu-sprite');
     const petActionBubble = document.getElementById('pet-action-bubble');
     const petActionBubbleTail = document.querySelector('.bubble-tail');
     const petStatusBar = document.getElementById('pet-status-bar');
@@ -4639,12 +4724,17 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     const hotspotMusicbox = document.getElementById('hotspot-musicbox');
     const hotspotHome = document.getElementById('hotspot-home');
     const hotspotPetTouch = document.getElementById('hotspot-pet-touch');
+    const hotspotDialogueHistory = document.getElementById('hotspot-dialogue-history');
     const roomSceneBg = document.getElementById('room-scene-bg');
     const bgmAudio = document.getElementById('bgm-audio');
 
     const roomViewport = document.getElementById('room-viewport');
     const roomScene = document.getElementById('room-scene');
     const petDialogBar = document.getElementById('pet-dialog-bar');
+    const petDialogBarInner = document.getElementById('pet-dialog-bar-inner');
+    const petDialogSpeaker = document.getElementById('pet-dialog-speaker');
+    const petDialogSpeakerIcon = document.getElementById('pet-dialog-speaker-icon');
+    const petDialogSpeakerName = document.getElementById('pet-dialog-speaker-name');
     const petDialogText = document.getElementById('pet-dialog-text');
     const petThinkingZone = document.getElementById('pet-thinking-zone');
     const petThinkingText = document.getElementById('pet-thinking-text');
@@ -4730,7 +4820,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         bed:   { left: 43, top: 15 },          // 床
         home:  { left: 55, top: 68 },          // 初始位置（地毯中心）
         diary: { left: 79.67, top: 69.05 },    // 日记（桌面右下角）
-        pet_touch: { left: 70.43, top: 45.80 } // 去摸我热点
+        pet_touch: { left: 70.43, top: 45.80 }, // 去摸我热点
+        dialogue_history: { left: 74.72, top: 76.72 } // 旅行对话历史
         // 如果想覆盖 bed/cabinet 的像素坐标，也可以在这里添加，例如：
         // bed: { left: 50, top: 50 },
     };
@@ -4873,6 +4964,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         positionHotspot(hotspotMusicbox, 'musicbox');
         positionHotspot(hotspotHome, 'home');
         positionHotspot(hotspotPetTouch, 'pet_touch');
+        positionHotspot(hotspotDialogueHistory, 'dialogue_history');
     }
 
     if (roomSceneBg) {
@@ -4886,16 +4978,33 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     window.addEventListener('resize', updateRoomHotspotPositions);
 
     // 统一的宠物对话展示：在宠物页底部对话栏中显示当前消息
+    function setPetDialogSpeaker(speakerName) {
+        const name = speakerName || '小粟';
+        const isPikachu = name === '比卡丘';
+        const cfg = isPikachu ? NPC_CONFIG.pikachu : (typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null);
+        if (petDialogSpeakerIcon) petDialogSpeakerIcon.textContent = isPikachu ? '⚡' : (cfg && cfg.icon ? cfg.icon : '🐰');
+        if (petDialogSpeakerName) petDialogSpeakerName.textContent = name;
+        if (petDialogSpeaker) {
+            petDialogSpeaker.classList.toggle('pikachu-active', isPikachu);
+        }
+        const inner = petDialogBarInner || (petDialogBar ? petDialogBar.querySelector('#pet-dialog-bar-inner') : null);
+        if (inner && cfg && cfg.bubbleColor) {
+            inner.style.borderColor = cfg.bubbleColor;
+        }
+        if (petAvatarRoom) petAvatarRoom.classList.toggle('pet-speaking', !isPikachu);
+        if (npcPikachuRoom) npcPikachuRoom.classList.toggle('npc-speaking', isPikachu);
+    }
+
     function showPetMessage(message, options = {}) {
         if (!petDialogBar || !petDialogText) return;
 
-        petDialogText.textContent = message;
-
-        // 根据当前人格配置调整对话栏边框颜色
-        const cfg = typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null;
-        if (cfg && cfg.bubbleColor) {
-            petDialogBar.querySelector('div').style.borderColor = cfg.bubbleColor;
+        if (petDialogBar.__npcDialogueTimer) {
+            clearTimeout(petDialogBar.__npcDialogueTimer);
+            petDialogBar.__npcDialogueTimer = null;
         }
+
+        setPetDialogSpeaker(options.speaker || '小粟');
+        petDialogText.textContent = message;
 
         petDialogBar.classList.add('visible');
 
@@ -4904,8 +5013,162 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             window.clearTimeout(petDialogBar.__hideTimer);
             petDialogBar.__hideTimer = window.setTimeout(() => {
                 petDialogBar.classList.remove('visible');
+                if (petAvatarRoom) petAvatarRoom.classList.remove('pet-speaking');
+                if (npcPikachuRoom) npcPikachuRoom.classList.remove('npc-speaking');
             }, duration);
         }
+    }
+
+    function buildLocalFallbackNpcDialogue(location, diaryContent) {
+        const loc = location || '外面';
+        const snippet = diaryContent ? String(diaryContent).slice(0, 40) : '好多新鲜事';
+        return [
+            { speaker: '小粟', text: `刚从【${loc}】回来～${snippet}…` },
+            { speaker: '比卡丘', text: '皮卡～然后呢？最好吃的是什么？' },
+            { speaker: '小粟', text: '味道像阳光一样～要尝尝吗？' },
+            { speaker: '比卡丘', text: '听起来超——级——棒！下次我也要去！' }
+        ];
+    }
+
+    function appendNpcDialogueHistory(entry) {
+        if (!entry || !Array.isArray(entry.lines) || entry.lines.length === 0) return;
+        if (!Array.isArray(appState.npcDialogueHistory)) appState.npcDialogueHistory = [];
+        appState.npcDialogueHistory.push(entry);
+        while (appState.npcDialogueHistory.length > NPC_DIALOGUE_HISTORY_MAX) {
+            appState.npcDialogueHistory.shift();
+        }
+        saveState();
+    }
+
+    function playNpcDialogueSequence(lines, options = {}) {
+        if (!Array.isArray(lines) || lines.length === 0) {
+            if (typeof options.onComplete === 'function') options.onComplete();
+            return;
+        }
+        if (!petDialogBar || !petDialogText) {
+            if (typeof options.onComplete === 'function') options.onComplete();
+            return;
+        }
+
+        if (petDialogBar.__hideTimer) {
+            clearTimeout(petDialogBar.__hideTimer);
+            petDialogBar.__hideTimer = null;
+        }
+        if (petDialogBar.__npcDialogueTimer) {
+            clearTimeout(petDialogBar.__npcDialogueTimer);
+            petDialogBar.__npcDialogueTimer = null;
+        }
+
+        const stepDuration = options.duration != null ? options.duration : 3000;
+        let index = 0;
+
+        const showLine = () => {
+            const line = lines[index];
+            if (!line || !line.text) {
+                index += 1;
+                if (index < lines.length) {
+                    petDialogBar.__npcDialogueTimer = setTimeout(showLine, 200);
+                } else {
+                    finish();
+                }
+                return;
+            }
+
+            const speaker = line.speaker === '比卡丘' ? '比卡丘' : '小粟';
+            setPetDialogSpeaker(speaker);
+            petDialogText.textContent = line.text;
+            petDialogBar.classList.add('visible');
+
+            if (speaker === '比卡丘') {
+                if (typeof playNpcAnimation === 'function') playNpcAnimation('interact');
+            } else if (typeof playPetAnimation === 'function') {
+                playPetAnimation('interact');
+            }
+
+            index += 1;
+            if (index < lines.length) {
+                petDialogBar.__npcDialogueTimer = setTimeout(showLine, stepDuration);
+            } else {
+                petDialogBar.__npcDialogueTimer = setTimeout(finish, stepDuration);
+            }
+        };
+
+        function finish() {
+            petDialogBar.__npcDialogueTimer = null;
+            if (typeof playNpcAnimation === 'function') playNpcAnimation('idle_breath');
+            if (typeof playPetAnimation === 'function') playPetAnimation('idle_breath');
+            if (petAvatarRoom) petAvatarRoom.classList.remove('pet-speaking');
+            if (npcPikachuRoom) npcPikachuRoom.classList.remove('npc-speaking');
+            petDialogBar.classList.remove('visible');
+            if (typeof options.onComplete === 'function') options.onComplete();
+        }
+
+        showLine();
+    }
+
+    async function startPostCheckinNpcDialogue(ctx) {
+        const location = (ctx && ctx.location) || '';
+        const diaryMeta = ctx && ctx.diaryMeta;
+        const diaryContent = (ctx && ctx.diaryContent) || '';
+        const moodTag = (ctx && ctx.moodTag) || '';
+        const memoryCount = typeof (ctx && ctx.memoryCount) === 'number' ? ctx.memoryCount : 0;
+        const episodicSnippet = (ctx && ctx.episodicSnippet) || '';
+
+        let lines = [];
+        let usedFallback = false;
+
+        try {
+            const res = await fetch('/api/npc/dialogue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    trigger: 'post_checkin',
+                    location,
+                    diaryId: diaryMeta && diaryMeta.diaryId ? String(diaryMeta.diaryId) : undefined,
+                    diaryTitle: diaryMeta && diaryMeta.title ? diaryMeta.title : undefined,
+                    diaryContent,
+                    moodTag,
+                    petPersonality: appState.petPersonality,
+                    ownerTitle: getOwnerTitle(),
+                    episodicSnippet,
+                    memoryCount
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.dialogue) && data.dialogue.length > 0) {
+                    lines = data.dialogue;
+                    usedFallback = !!data.fallback;
+                }
+            }
+        } catch (e) {
+            console.warn('[NPC Dialogue] fetch failed:', e);
+        }
+
+        if (!lines.length) {
+            lines = buildLocalFallbackNpcDialogue(location, diaryContent);
+            usedFallback = true;
+            playNpcDialogueSequence(lines);
+        } else {
+            playNpcDialogueSequence(lines);
+        }
+
+        appendNpcDialogueHistory({
+            diaryId: diaryMeta && diaryMeta.diaryId ? String(diaryMeta.diaryId) : '',
+            location,
+            date: (diaryMeta && diaryMeta.date) || new Date().toLocaleDateString('zh-CN').replace(/\//g, '-'),
+            lines,
+            ts: Date.now(),
+            fallback: usedFallback
+        });
+    }
+
+    function initNpcPikachuPosition() {
+        if (!npcPikachuRoom || !NPC_CONFIG.pikachu) return;
+        const pos = NPC_CONFIG.pikachu.defaultPosition || { left: '32%', bottom: '20%' };
+        npcPikachuRoom.style.left = pos.left;
+        npcPikachuRoom.style.bottom = pos.bottom;
+        npcPikachuRoom.style.transform = 'translateX(-50%)';
     }
 
     // 思考过程序列展示：仅更新「思考区」，不占用底部气泡；可选地在第 1 步下方展示本次参考的记忆列表
@@ -8297,6 +8560,10 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             modalPanel.className = 'bg-[#fffaf0] rounded-3xl w-[94%] h-[82%] p-4 flex flex-col shadow-2xl';
             modalBody.className = MODAL_BODY_CLASS_MEMORY;
             modalPanel.setAttribute('data-modal-variant', 'memory');
+        } else if (variant === 'dialogue_history') {
+            modalPanel.className = 'bg-[#fffaf0] rounded-3xl w-[94%] h-[82%] p-4 flex flex-col shadow-2xl';
+            modalBody.className = MODAL_BODY_CLASS_DEFAULT;
+            modalPanel.setAttribute('data-modal-variant', 'dialogue_history');
         } else {
             modalPanel.className = 'bg-[#fffaf0] rounded-3xl w-[90%] max-h-[75%] p-4 flex flex-col shadow-2xl';
             modalBody.className = MODAL_BODY_CLASS_DEFAULT;
@@ -8313,12 +8580,108 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         if (modalPanel) {
             modalPanel.removeAttribute('data-modal-variant');
             modalPanel.removeAttribute('data-cabinet-subview');
+            modalPanel.removeAttribute('data-dialogue-subview');
         }
         if (modalBody) {
             modalBody.innerHTML = '';
             modalBody.className = MODAL_BODY_CLASS_DEFAULT;
             modalBody.style.overflow = '';
         }
+    }
+
+    function renderNpcDialogueBubbleLine(line) {
+        if (!line || !line.text) return '';
+        const isPikachu = line.speaker === '比卡丘';
+        const cls = isPikachu ? 'pikachu' : 'xiaosu';
+        const label = isPikachu ? '⚡ 比卡丘' : '🌻 小粟';
+        return `
+            <div class="flex flex-col gap-0.5 ${isPikachu ? 'items-end' : 'items-start'}">
+                <span class="text-[10px] font-bold text-gray-500">${escapeHtml(label)}</span>
+                <div class="npc-dialogue-bubble ${cls}">${escapeHtml(String(line.text))}</div>
+            </div>
+        `;
+    }
+
+    function renderNpcDialogueHistoryDetailHtml(entry) {
+        if (!entry) return '<p class="text-sm text-gray-600">找不到这条对话记录。</p>';
+        const lines = Array.isArray(entry.lines) ? entry.lines : [];
+        const loc = entry.location || '未知地点';
+        const date = entry.date || '';
+        const bubbles = lines.map(renderNpcDialogueBubbleLine).join('');
+        const backBtn = `<button type="button" class="text-xs font-bold text-[#ff8fab] mb-3" data-dialogue-history-back>← 返回列表</button>`;
+        return `
+            ${backBtn}
+            <div class="mb-3">
+                <div class="text-sm font-bold text-gray-800">${escapeHtml(loc)}</div>
+                <div class="text-xs text-gray-500">${escapeHtml(date)} · ${lines.length} 轮对话${entry.fallback ? ' · 本地模板' : ''}</div>
+            </div>
+            <div class="flex flex-col gap-3 pb-2">${bubbles}</div>
+        `;
+    }
+
+    function bindDialogueHistoryModalActions(subview) {
+        if (!modalBody) return;
+        if (subview === 'list') {
+            modalBody.querySelectorAll('[data-dialogue-history-key]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const key = btn.getAttribute('data-dialogue-history-key');
+                    openDialogueHistoryDetailModal(key);
+                });
+            });
+        } else if (subview === 'detail') {
+            const back = modalBody.querySelector('[data-dialogue-history-back]');
+            if (back) {
+                back.addEventListener('click', () => openDialogueHistoryModal());
+            }
+        }
+    }
+
+    function renderNpcDialogueHistoryListHtml() {
+        const history = Array.isArray(appState.npcDialogueHistory)
+            ? appState.npcDialogueHistory.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))
+            : [];
+        if (!history.length) {
+            return '<p class="text-sm text-gray-600 text-center py-10">还没有旅行对话，去地图打卡一次吧～</p>';
+        }
+        return history.map((entry) => {
+            const key = entry.diaryId || String(entry.ts || '');
+            const loc = entry.location || '未知地点';
+            const date = entry.date || '';
+            const count = Array.isArray(entry.lines) ? entry.lines.length : 0;
+            const preview = (entry.lines && entry.lines[0] && entry.lines[0].text)
+                ? String(entry.lines[0].text).slice(0, 36)
+                : '';
+            return `
+                <button type="button" data-dialogue-history-key="${escapeHtml(key)}"
+                    class="npc-dialogue-history-item w-full text-left glass-card rounded-2xl p-3 border border-[#ff8fab]/20">
+                    <div class="flex justify-between items-start gap-2">
+                        <span class="text-sm font-bold text-gray-800">${escapeHtml(loc)}</span>
+                        <span class="text-[10px] text-gray-500 shrink-0">${escapeHtml(date)}</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">${count} 轮 · ${escapeHtml(preview)}${preview.length >= 36 ? '…' : ''}</div>
+                </button>
+            `;
+        }).join('');
+    }
+
+    function openDialogueHistoryDetailModal(key) {
+        if (!key) return;
+        const entry = (appState.npcDialogueHistory || []).find(
+            (e) => String(e.diaryId || '') === String(key) || String(e.ts || '') === String(key)
+        );
+        if (!entry) {
+            openDialogueHistoryModal();
+            return;
+        }
+        if (modalPanel) modalPanel.setAttribute('data-dialogue-subview', 'detail');
+        openModal('旅行对话 · ' + (entry.location || ''), renderNpcDialogueHistoryDetailHtml(entry), 'dialogue_history');
+        bindDialogueHistoryModalActions('detail');
+    }
+
+    function openDialogueHistoryModal() {
+        if (modalPanel) modalPanel.setAttribute('data-dialogue-subview', 'list');
+        openModal('旅行对话记录', renderNpcDialogueHistoryListHtml(), 'dialogue_history');
+        bindDialogueHistoryModalActions('list');
     }
 
     let soulCopyToastTimer = null;
@@ -9670,6 +10033,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     }
 
     function enterPetRoom() {
+        if (typeof initNpcPikachuPosition === 'function') initNpcPikachuPosition();
+        if (typeof playNpcAnimation === 'function') playNpcAnimation('idle_breath');
         const hasUnread = (diaryBadge && !diaryBadge.classList.contains('hidden')) || (petRoomBadge && !petRoomBadge.classList.contains('hidden'));
         if (hasUnread) {
             setPetState(PET_STATES.INTERACT);
@@ -9713,8 +10078,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         if (highlight && highlight.location) {
             try {
                 if (typeof showPetMessage === 'function') {
-                    const loc = highlight.location;
-                    showPetMessage(`今天把脚步落在【${loc}】啦，小屋里悄悄多了一点新变化～`, { duration: 4000 });
+                    showPetMessage('小粟和比卡丘刚聊完这次旅行，点「对话」可查看完整记录～', { duration: 4500 });
                 }
             } catch (e) {
                 // 视觉反馈失败时忽略，不影响主流程
@@ -9835,6 +10199,14 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         hotspotDiary.addEventListener('click', (event) => {
             event.stopPropagation();
             openDiaryModal();
+        });
+    }
+
+    if (hotspotDialogueHistory) {
+        hotspotDialogueHistory.addEventListener('click', (event) => {
+            event.stopPropagation();
+            wiggleHotspot(hotspotDialogueHistory);
+            if (typeof openDialogueHistoryModal === 'function') openDialogueHistoryModal();
         });
     }
 
@@ -10571,7 +10943,18 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 appState.simulatedDayIndex = (typeof appState.simulatedDayIndex === 'number' ? appState.simulatedDayIndex : 0) + 1;
                 if (typeof syncMvpSimDayPanel === 'function') syncMvpSimDayPanel();
                 saveState();
-                triggerAIPetAction(`刚才去了${location}`);
+                if (typeof startPostCheckinNpcDialogue === 'function') {
+                    startPostCheckinNpcDialogue({
+                        location,
+                        diaryMeta,
+                        diaryContent: diaryText,
+                        moodTag: emotionFromLLM || '',
+                        memoryCount: memoryCountForHint,
+                        episodicSnippet: summaryFromLLM || ''
+                    });
+                } else {
+                    triggerAIPetAction(`刚才去了${location}`);
+                }
                 setPetState(PET_STATES.INTERACT);
                 if (petRoomBadge) petRoomBadge.classList.remove('hidden'); // 提示宠物房间有新动态
                 if (diaryBadge) diaryBadge.classList.remove('hidden');   // 提示宠物页有新日记
@@ -11679,6 +12062,17 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         if (cls) {
             petAvatarSprite.classList.add(cls);
         }
+    }
+
+    const npcAnimation = { currentState: 'idle_breath' };
+
+    function playNpcAnimation(stateKey) {
+        if (!npcPikachuSprite || !NPC_CONFIG.pikachu) return;
+        const map = NPC_CONFIG.pikachu.animationMap || {};
+        const gifSrc = map[stateKey] || map.idle_breath;
+        if (!gifSrc) return;
+        npcAnimation.currentState = stateKey;
+        npcPikachuSprite.src = gifSrc + '?t=' + Date.now();
     }
 
     function startIdleAnimation() {

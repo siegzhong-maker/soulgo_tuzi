@@ -91,10 +91,9 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 ### 文档范围（技术）
 
 - 主体：[`index.html`](index.html) 单页与直接依赖的 [`api/*.js`](api)。  
-- 收集物素材与清单：[`场景/`](场景/)（含 [`场景/generated/`](场景/generated/) 下 `pet-home-assets`、`aigc-cutouts`、`badges`、`exports` 等；详见下文「项目素材与清单」）。  
 - 硬件：[`bleConfig.js`](bleConfig.js)、[`esp32BleClient.js`](esp32BleClient.js)（与固件 GATT 对齐）。  
 - 静态资源：仓库根 [`soul.md`](soul.md) 与 `index.html` 一并部署到站点根（`GET /soul.md`），供「核心档案」与兜底 JSON。  
-- 技术重点：**RAG + 记忆** 的写入→检索→注入生成→可视化解释；**soul.md / 核心档案** 与生成链路分工；**旅行收集物（静态池 + manifest + 动态生图）**；可选 **BLE 震动反馈**。
+- 技术重点：**RAG + 记忆** 的写入→检索→注入生成→可视化解释；**soul.md / 核心档案** 与生成链路分工；可选 **BLE 震动反馈**。
 
 ## 产品概览（MVP 当前形态）
 
@@ -138,7 +137,7 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 | RAG | 生成日记时自动 | **向量检索召回 topK** | 不直接落前端状态（仅影响生成结果） | **`POST /api/retrieve`** | **RAG 召回**（embedding query → cosine topK）；query 在服务端由地点、性格、爱好及 **`semanticProfileSnapshot` 偏好词**、习惯摘要等拼接 |
 | RAG | 记忆面板（调试） | 查看向量记忆池总数/最近 N 条/地点分布 | 仅展示，不持久化 | **`GET /api/debug-memories`** | **RAG 可观测性**（验证写入是否成功） |
 | 橱柜 | 热点「橱柜」 | 打开橱柜弹窗（格子数见 `CABINET_SLOTS`，当前为 100） | `cabinetItems` 渲染；打开后清未读 | - | - |
-| 橱柜 | 旅行日记内领取 | 纪念品 → Reward Modal | `cabinetItems` 增加；`cabinetHasNewUnseen=true` | 同日记收集物流 | 可能绑定 `memoryTag`、合作款等；动态贴纸可走 **`POST /api/generate-collectible`**（serverless 下优先上传对象存储） |
+| 橱柜 | 旅行日记内领取 | 纪念品 → Reward Modal | `cabinetItems` 增加；`cabinetHasNewUnseen=true` | 同日记收集物流 | 可能绑定 `memoryTag`、合作款等 |
 | 橱柜 | 打卡时解析 | cabinetPlan 解锁物品/家具主题建议 | `lastFurnitureSuggestion` 写入；用于解释来源 | `POST /api/diary`（返回 `cabinetPlan`） | **RAG 参与“收藏/主题建议”**（生成侧输出） |
 | 家具 | 制作流程 | 制作纪念品遮罩（进度/提示） | 仅 UI 过渡；之后可能可摆放 | `POST /api/generate-furniture` | - |
 | 房间 | Reward Modal 选择 | 立即摆放/放入橱柜 | `placedFurniture` / `cabinetItems` 更新 | - | - |
@@ -315,7 +314,6 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 - **家具制作（生成资产）**
   - `POST /api/generate-furniture`：根据地点/日记片段生成一张“单个家具资产”图（isometric 3D 风格）
   - 前端有“制作中遮罩”承接过程，并支持“立即摆放”
-- **生产部署（tuzi 线）**：日记配图经 **`/api/diary-image-job`** 异步生成并可选写入 S3/R2；未配置对象存储时大图 `data:` URL 易被 localStorage 配额裁掉，详见 README 与 `.env.example`
 
 ## AIGC 能力（除 RAG 外的生成）
 
@@ -324,7 +322,6 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 - **日记配图生成**：`POST /api/generate-image`
   - 前端在日记生成后异步触发
   - 成功后写入 `appState.diaryImages[diaryId]` 并支持导出
-- **旅行收集物贴纸（打卡动态兜底）**：`POST /api/generate-collectible`（OpenRouter 图像模型 + 服务端抠图；逻辑与素材目录见上文「收集物」与「项目素材与清单」）
 
 ## 本地存储与状态持久化
 
@@ -346,7 +343,6 @@ SoulGo 把「去一个地方打卡」变成**可积累的陪伴体验**：电子
 - **`POST /api/retrieve`**：对 query embedding 后从向量记忆池 topK 召回（同上 Google Key）
 - **`GET /api/debug-memories`**：调试用：查看向量记忆池最近 N 条
 - **`POST /api/generate-image`**：生成日记配图
-- **`POST /api/generate-collectible`**：按地点/品类生成透明底旅行贴纸；依赖 **`OPENROUTER_API_KEY`**（及可选 `OPENROUTER_IMAGE_MODEL`）；可与 manifest 静态池互补或覆盖掉落结果
 - **`POST /api/generate-furniture`**：生成家具资产
 - **`POST /api/diary-image-comment`**：日记插图相关短评；使用 soul 短摘要 + 可选 `semanticProfileSnapshot`。请求体带 `diaryImageMode: "collectibleScore"` 时同一路由返回物品/情绪关键词 JSON（原独立 `diary-collectible-score` 已合并，避免超过 Vercel Hobby serverless 数量上限）
 - **`POST /api/pet/decide`**：宠物自主行为意图（OpenRouter）；使用 soul 短摘要；前端通过 `window.PET_DECIDE_API_URL` 指向（默认 `/api/pet/decide`）

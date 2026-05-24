@@ -1,6 +1,6 @@
 /**
  * Vercel Serverless Function: pet behavior decision via OpenRouter Gemini 2.0 Flash.
- * Accepts POST { mood, health, currentState, lastUserAction?, recentBehaviors?, timestamp }
+ * Accepts POST { mood, health, recentEmotion?, currentState, lastUserAction?, recentBehaviors?, timestamp }
  * Returns { intent, reason } with intent one of: go_to_bed_and_rest, check_cabinet, wait_at_door, play_with_user, walk_randomly.
  */
 import { getSoulShortBlurb } from '../../lib/load-soul.js';
@@ -25,6 +25,8 @@ const SYSTEM_PROMPT_BASE = `你是小粟的行为决策助手。小粟是美食�
 - play_with_user：和主人互动（适合心情好、健康尚可时）
 - walk_randomly：在房间里随便走走（适合状态中性、轻度活动时）
 
+如果“最近记忆情绪”已提供，请优先按该情绪理解即时状态；数值心情仅作为辅助参考。
+
 你必须只输出一行合法 JSON，格式为：{"intent":"<上述之一>","reason":"简短原因"}，不要其他文字、不要 markdown 代码块。`;
 
 function getPetDecideSystemPrompt() {
@@ -34,8 +36,9 @@ function getPetDecideSystemPrompt() {
 }
 
 function buildUserPrompt(body) {
-    const { mood, health, currentState, lastUserAction, recentBehaviors } = body || {};
+    const { mood, health, recentEmotion, currentState, lastUserAction, recentBehaviors } = body || {};
     const parts = [
+        `最近记忆情绪：${recentEmotion || '未知'}`,
         `心情数值：${typeof mood === 'number' ? mood : 0}（-100 到 100，越高越开心）`,
         `健康数值：${typeof health === 'number' ? health : 100}（0 到 100）`,
         `当前状态：${currentState || '未知'}`

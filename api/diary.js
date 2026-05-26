@@ -46,8 +46,10 @@ const DIARY_SYSTEM_PROMPT_BASE = `你是小粟：住在森林里、爱尝遍世�
   "moodTag": "一个情绪标签，如：兴奋/温暖/好奇/平静 等，用中文或简单英文都可以",
   "behaviorPlan": [
     { "type": "emote", "value": "thinking", "duration": 1000 },
-    { "type": "walk", "target": "pot" },
-    { "type": "anim", "value": "eat", "duration": 1500 },
+    { "type": "walk", "target": "musicbox" },
+    { "type": "anim", "value": "interact", "duration": 1200 },
+    { "type": "walk", "target": "diary" },
+    { "type": "anim", "value": "idle_observe", "duration": 1500 },
     { "type": "state", "value": "idle_observe" }
   ],
   "cabinetPlan": {
@@ -75,6 +77,7 @@ const DIARY_SYSTEM_PROMPT_BASE = `你是小粟：住在森林里、爱尝遍世�
 【约束】
 - 一定要返回合法 JSON，字段名与结构必须完全匹配，不要多也不要少。
 - behaviorPlan 中的 type 仅使用：emote / walk / anim / state / wait。
+- walk 的 target 可选：bed / pot / cabinet / musicbox / diary（打卡后回小屋优先 musicbox、diary）。
 - cabinetPlan.unlockItems 可以为空数组；如果本次地点没有明显“纪念品”，就返回空数组。
 - thinkingSteps 建议 2～4 条，每条尽量短一些，但要具体、有画面。`;
 
@@ -253,8 +256,10 @@ function buildFallbackDiary(payload, episodicMemories) {
 
   const behaviorPlan = [
     { type: 'emote', value: 'thinking', duration: 1000 },
-    { type: 'walk', target: 'pot' },
-    { type: 'anim', value: 'eat', duration: 1500 },
+    { type: 'walk', target: 'musicbox' },
+    { type: 'anim', value: 'interact', duration: 1200 },
+    { type: 'walk', target: 'diary' },
+    { type: 'anim', value: 'idle_observe', duration: 1500 },
     { type: 'state', value: 'idle_observe' }
   ];
 
@@ -268,7 +273,7 @@ function buildFallbackDiary(payload, episodicMemories) {
       ? `我从篮子里翻出 ${episodicMemories.length} 条和这次有关的记忆，先嗅了嗅「熟悉感」。`
       : `第一次来${city}，我也要把今天的味道标在新叶子上～`,
     `这次在 ${city} 的气味和画面，我想留一点在房间和橱柜里，像藏一颗小果子。`,
-    `回小屋后先去锅边转转，想想能不能给 ${city} 做一件野趣小摆件，不浪费这份印象。`
+    `回小屋后先去音乐盒边听听，再翻翻日记，把 ${city} 的味道记牢一点。`
   ];
 
   return { title, content, moodTag, behaviorPlan, cabinetPlan, thinkingSteps };

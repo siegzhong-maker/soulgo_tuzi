@@ -2209,6 +2209,19 @@
             gap: 0.75rem;
             padding-bottom: 0.25rem;
         }
+        #pet-dialog-text.npc-dialogue-emoji-only {
+            font-size: 2rem;
+            line-height: 1.35;
+            text-align: center;
+            letter-spacing: 0.08em;
+        }
+        .npc-dialogue-bubble--emoji {
+            font-size: 1.75rem;
+            line-height: 1.3;
+            text-align: center;
+            letter-spacing: 0.06em;
+            padding: 0.65rem 0.85rem;
+        }
 
         /* 旧房间内跟随气泡默认不展示，由底部对话栏替代 */
         #pet-action-bubble,
@@ -5019,10 +5032,10 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     const HOTSPOT_POSITIONS_PCT = {
         pot:   { left: 19.52, top: 55.74 },    // 小锅（点击大锅上沿实测坐标）
         map:   { left: 24, top: 26 },          // 地图挂画（墙上空画框）
-        musicbox: { left: 74.48, top: 56.34 }, // 音乐盒
+        musicbox: { left: 71.06, top: 64.08 }, // 音乐盒（坐标拾取）
         bed:   { left: 43, top: 15 },          // 床
         home:  { left: 55, top: 68 },          // 初始位置（地毯中心）
-        diary: { left: 79.67, top: 69.05 },    // 日记（桌面右下角）
+        diary: { left: 72.29, top: 68.53 },    // 日记（坐标拾取）
         pet_touch: { left: 70.43, top: 45.80 }, // 去摸我热点
         dialogue_history: { left: 74.72, top: 76.72 } // 旅行对话历史
         // 如果想覆盖 bed/cabinet 的像素坐标，也可以在这里添加，例如：
@@ -5068,7 +5081,10 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         // 橱柜：Left: 30.48%, Top: 24.07% → Bottom: 75.93%
         cabinet: { left: '30.48%', bottom: '75.93%' },
         // 去摸我热点：Left 67.20%, Top 57.00% → Bottom 43.00%
-        pet_touch: { left: '67.20%', bottom: '43.00%' }
+        pet_touch: { left: '67.20%', bottom: '43.00%' },
+        // 音乐盒 / 日记：bottom = 100 - top（坐标拾取）
+        musicbox: { left: '71.06%', bottom: '35.92%' },
+        diary: { left: '72.29%', bottom: '31.47%' }
     };
 
     const WANDER_AREAS = {
@@ -5222,14 +5238,26 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         }
     }
 
+    function npcLineDisplayEmoji(item) {
+        if (!item || typeof item !== 'object') return '';
+        const emoji = String(item.emoji || '').trim();
+        if (emoji) return emoji.slice(0, 8);
+        const text = String(item.text || '').trim();
+        if (text) return '📝';
+        const speaker = String(item.speaker || '').trim();
+        return speaker === '比卡丘' ? '⚡' : '🌻';
+    }
+
     function buildLocalFallbackNpcDialogue(location, diaryContent) {
         const loc = location || '外面';
-        const snippet = diaryContent ? String(diaryContent).slice(0, 40) : '好多新鲜事';
+        const hasFood = diaryContent && /吃|味|香|甜|辣/.test(String(diaryContent));
         return [
-            { speaker: '小粟', text: `刚从【${loc}】回来～${snippet}…` },
-            { speaker: '比卡丘', text: '皮卡～然后呢？最好吃的是什么？' },
-            { speaker: '小粟', text: '味道像阳光一样～要尝尝吗？' },
-            { speaker: '比卡丘', text: '听起来超——级——棒！下次我也要去！' }
+            { speaker: '小粟', emoji: hasFood ? '🌻😋🤤' : '🌻✨🗺️' },
+            { speaker: '比卡丘', emoji: '⚡👀❓' },
+            { speaker: '小粟', emoji: hasFood ? '😋☀️' : '💛🌿' },
+            { speaker: '比卡丘', emoji: '⚡🎉✨' },
+            { speaker: '小粟', emoji: `📍${loc.length > 4 ? '🌻' : '🌻🧺'}` },
+            { speaker: '比卡丘', emoji: '⚡💪🔥' }
         ];
     }
 
@@ -5239,13 +5267,10 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         for (const item of rawLines) {
             if (!item || typeof item !== 'object') continue;
             const speaker = String(item.speaker || '').trim();
-            const text = String(item.text || '').trim();
             if (speaker !== '小粟' && speaker !== '比卡丘') continue;
-            if (!text) continue;
-            lines.push({
-                speaker,
-                text: text.length > 80 ? text.slice(0, 77) + '…' : text
-            });
+            const emoji = npcLineDisplayEmoji(item);
+            if (!emoji) continue;
+            lines.push({ speaker, emoji });
         }
         return lines.slice(0, 12);
     }
@@ -5286,7 +5311,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
         const showLine = () => {
             const line = lines[index];
-            if (!line || !line.text) {
+            const display = line && (line.emoji || line.text);
+            if (!line || !display) {
                 index += 1;
                 if (index < lines.length) {
                     petDialogBar.__npcDialogueTimer = setTimeout(showLine, 200);
@@ -5298,7 +5324,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
             const speaker = line.speaker === '比卡丘' ? '比卡丘' : '小粟';
             setPetDialogSpeaker(speaker);
-            petDialogText.textContent = line.text;
+            petDialogText.textContent = line.emoji || line.text;
+            petDialogText.classList.add('npc-dialogue-emoji-only');
             petDialogBar.classList.add('visible');
 
             if (speaker === '比卡丘') {
@@ -5317,6 +5344,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
         function finish() {
             petDialogBar.__npcDialogueTimer = null;
+            if (petDialogText) petDialogText.classList.remove('npc-dialogue-emoji-only');
             if (typeof playNpcAnimation === 'function') playNpcAnimation('idle_breath');
             if (typeof playPetAnimation === 'function') playPetAnimation('idle_breath');
             if (petAvatarRoom) petAvatarRoom.classList.remove('pet-speaking');
@@ -5488,6 +5516,12 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
         // 橱柜：走到左侧墙边
         if (hotspotKey === 'cabinet') {
+            path.push(ROOM_WAYPOINTS.rugEdge, target);
+            return path;
+        }
+
+        // 音乐盒 / 日记：经地毯边缘再落点
+        if (hotspotKey === 'musicbox' || hotspotKey === 'diary') {
             path.push(ROOM_WAYPOINTS.rugEdge, target);
             return path;
         }
@@ -5979,6 +6013,26 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             vibrationPattern: 'happy_short',
             moodDelta: 5,
             healthDelta: 0
+        },
+        musicbox: {
+            position: { left: '71.06%', bottom: '35.92%' },
+            context: '凑到音乐盒边晃了晃耳朵',
+            stayMs: 2000,
+            animationState: 'interact',
+            resultingState: PET_STATES.IDLE_OBSERVE,
+            vibrationPattern: 'happy_short',
+            moodDelta: 3,
+            healthDelta: 0
+        },
+        diary: {
+            position: { left: '72.29%', bottom: '31.47%' },
+            context: '趴在日记本旁回味刚才的旅行',
+            stayMs: 2200,
+            animationState: 'idle_observe',
+            resultingState: PET_STATES.IDLE_OBSERVE,
+            vibrationPattern: 'happy_short',
+            moodDelta: 4,
+            healthDelta: 0
         }
     };
 
@@ -6063,7 +6117,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     };
                 }
                 if (rand < 0.9) {
-                    const hotspots = ['cabinet', 'pot'];
+                    const hotspots = ['cabinet', 'pot', 'musicbox', 'diary'];
                     const hotspot = hotspots[Math.floor(Math.random() * hotspots.length)];
                     return {
                         type: 'moveToHotspot',
@@ -6102,7 +6156,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                     return { type: 'wander', area, context: '在房间里随便走走' };
                 }
                 if (rand < 0.85) {
-                    const hotspots = ['cabinet', 'pot'];
+                    const hotspots = ['cabinet', 'pot', 'musicbox', 'diary'];
                     const hotspot = hotspots[Math.floor(Math.random() * hotspots.length)];
                     return { type: 'moveToHotspot', hotspot };
                 }
@@ -6153,7 +6207,13 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             return INTENT_TO_STATUS_LABEL[intentOrDecision];
         if (intentOrDecision && typeof intentOrDecision === 'object') {
             if (intentOrDecision.type === 'moveToHotspot' && intentOrDecision.hotspot) {
-                const labels = { bed: '准备去床上休息…', cabinet: '准备去橱柜看看…', pot: '准备去锅边闻一闻…' };
+                const labels = {
+                    bed: '准备去床上休息…',
+                    cabinet: '准备去橱柜看看…',
+                    pot: '准备去锅边闻一闻…',
+                    musicbox: '准备去音乐盒边听听～',
+                    diary: '准备去翻翻旅行日记～'
+                };
                 return labels[intentOrDecision.hotspot] || '准备动一动…';
             }
             if (intentOrDecision.type === 'wander') return '在房间里随便走走…';
@@ -6174,6 +6234,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         if (decision.type === 'moveToHotspot' && decision.hotspot === 'bed') return often('go_to_bed') ? '又想去床上躺一会儿～' : '有点想休息一下～';
         if (decision.type === 'moveToHotspot' && decision.hotspot === 'cabinet') return often('go_to_cabinet') ? '又想去橱柜那边看看～' : '想去橱柜那边看看～';
         if (decision.type === 'moveToHotspot' && decision.hotspot === 'pot') return often('go_to_pot') ? '又想去小锅那边闻闻味道～' : '想去小锅那边闻一闻～';
+        if (decision.type === 'moveToHotspot' && decision.hotspot === 'musicbox') return '想凑到音乐盒边晃一晃耳朵～';
+        if (decision.type === 'moveToHotspot' && decision.hotspot === 'diary') return '想去日记本旁回味刚才的旅行～';
         if (decision.type === 'wander') return '在房间里随便走走吧～';
         if (decision.type === 'rest') return often('go_to_bed') || often('rest') ? '又想小睡一会儿…' : '想先小睡一会儿…';
         return '正在想想接下来做什么…';
@@ -6269,6 +6331,65 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             return { type: 'wander', area, context: '在房间里随便走走' };
         }
         return null;
+    }
+
+    /** 将 /api/diary 返回的 behaviorPlan（walk/emote）转为 runBehaviorSequence 可执行步骤 */
+    function normalizeDiaryBehaviorPlan(plan) {
+        if (!Array.isArray(plan) || plan.length === 0) return [];
+        const stateMap = {
+            idle_wait: PET_STATES.IDLE_WAIT,
+            idle_breath: PET_STATES.IDLE_BREATH,
+            idle_observe: PET_STATES.IDLE_OBSERVE,
+            interact: PET_STATES.INTERACT,
+            rest: PET_STATES.REST,
+            moving: PET_STATES.MOVING
+        };
+        const out = [];
+        for (const action of plan) {
+            if (!action || typeof action !== 'object') continue;
+            const type = String(action.type || '').toLowerCase();
+            if (type === 'walk') {
+                const hotspot = action.target || action.hotspot;
+                if (hotspot && ROOM_TARGET_HOTSPOTS[hotspot]) {
+                    out.push({ type: 'move', hotspot: String(hotspot), speed: action.speed || 650 });
+                }
+            } else if (type === 'emote') {
+                const anim = action.value || action.anim || 'interact';
+                out.push({ type: 'anim', anim, duration: action.duration || 1000 });
+            } else if (type === 'anim') {
+                out.push({
+                    type: 'anim',
+                    anim: action.anim || action.value || 'interact',
+                    duration: action.duration
+                });
+            } else if (type === 'state') {
+                const raw = action.state || action.value;
+                const state = stateMap[String(raw || '').toLowerCase()] || PET_STATES.IDLE_OBSERVE;
+                out.push({ type: 'state', state });
+            } else if (type === 'wait') {
+                out.push({ type: 'wait', duration: action.duration || 1000 });
+            } else if (type === 'move' && (action.hotspot || action.target)) {
+                out.push({
+                    type: 'move',
+                    hotspot: String(action.hotspot || action.target),
+                    speed: action.speed || 650
+                });
+            } else if (type === 'status' && action.text) {
+                out.push({ type: 'status', text: action.text });
+            }
+        }
+        return out;
+    }
+
+    /** 打卡后无有效 AI 行为计划时的默认路径：音乐盒 → 日记本 */
+    function getDefaultPostCheckinBehaviorSequence() {
+        return [
+            { type: 'move', hotspot: 'musicbox', speed: 650 },
+            { type: 'anim', anim: 'interact', duration: 1200 },
+            { type: 'move', hotspot: 'diary', speed: 650 },
+            { type: 'anim', anim: 'idle_observe', duration: 1500 },
+            { type: 'state', state: PET_STATES.IDLE_OBSERVE }
+        ];
     }
 
     // --- 行为链引擎 (Behavior Sequence Engine) ---
@@ -8812,7 +8933,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     }
 
     function renderNpcDialogueBubbleLine(line) {
-        if (!line || !line.text) return '';
+        const display = line && (line.emoji || line.text);
+        if (!display) return '';
         const isPikachu = line.speaker === '比卡丘';
         const cls = isPikachu ? 'pikachu' : 'xiaosu';
         const label = isPikachu ? '比卡丘' : '小粟';
@@ -8823,7 +8945,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 <div class="diary-paper-avatar diary-paper-avatar--sm" aria-hidden="true">${icon}</div>
                 <div class="npc-dialogue-row__content">
                     <span class="npc-dialogue-speaker-label">${escapeHtml(label)}</span>
-                    <div class="npc-dialogue-bubble ${cls}">${escapeHtml(String(line.text))}</div>
+                    <div class="npc-dialogue-bubble ${cls} npc-dialogue-bubble--emoji">${escapeHtml(String(display))}</div>
                 </div>
             </div>
         `;
@@ -8896,8 +9018,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             const date = entry.date || '';
             const validLines = getValidNpcDialogueLines(entry.lines);
             const count = validLines.length;
-            const preview = validLines[0] && validLines[0].text
-                ? String(validLines[0].text).slice(0, 36)
+            const preview = validLines[0]
+                ? String(validLines[0].emoji || validLines[0].text || '').slice(0, 12)
                 : '';
             return `
                 <button type="button" data-dialogue-history-key="${escapeHtml(key)}"
@@ -8910,8 +9032,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                         <span class="diary-paper-frame__chip diary-paper-frame__chip--muted shrink-0">${escapeHtml(date)}</span>
                     </div>
                     <div class="flex items-start justify-between gap-2 mt-0.5">
-                        <p class="text-xs text-[#7a6b5a] leading-relaxed flex-1 min-w-0" style="text-shadow: 0 1px 0 rgba(255,255,255,0.45);">
-                            ${escapeHtml(preview)}${preview.length >= 36 ? '…' : ''}
+                        <p class="text-lg leading-relaxed flex-1 min-w-0" aria-hidden="true">
+                            ${escapeHtml(preview)}
                         </p>
                         <span class="text-sm leading-none shrink-0" aria-hidden="true">🌻⚡</span>
                     </div>
@@ -10457,7 +10579,38 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     if (hotspotDiary) {
         hotspotDiary.addEventListener('click', (event) => {
             event.stopPropagation();
-            openDiaryModal();
+            if (isPetBusy() && petLife.current === PET_STATES.MOVING) {
+                updatePetStatus('我已经在往日记那边走啦～');
+                return;
+            }
+            wiggleHotspot(hotspotDiary);
+            markPetInteraction();
+            updatePetStatus('正在去翻日记…');
+            const preset = HOTSPOT_BEHAVIOR_PRESETS.diary;
+            const pCfg = typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null;
+            const path = buildPathToHotspot('diary', pCfg);
+            const onArriveDiary = () => {
+                if (preset && preset.vibrationPattern) triggerVibration(preset.vibrationPattern);
+                if (preset && typeof preset.moodDelta === 'number') {
+                    updateMoodAndHealth(preset.moodDelta, preset.healthDelta || 0);
+                }
+                if (preset && preset.context) triggerAIPetAction(preset.context);
+                if (typeof playPetAnimation === 'function') {
+                    playPetAnimation(preset ? preset.animationState : 'idle_observe', { loop: false });
+                }
+                schedulePetTransition(PET_STATES.IDLE_BREATH, preset ? preset.stayMs : 2200);
+                openDiaryModal();
+            };
+            if (path && path.length) {
+                walkPetAlongPath(path, {
+                    contextOverride: preset ? preset.context : '趴在日记本旁回味刚才的旅行',
+                    stayMs: preset ? preset.stayMs : 2200,
+                    resetToDefault: false,
+                    onArrive: onArriveDiary
+                });
+            } else {
+                onArriveDiary();
+            }
         });
     }
 
@@ -10482,9 +10635,38 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     if (hotspotMusicbox) {
         hotspotMusicbox.addEventListener('click', (event) => {
             event.stopPropagation();
+            if (isPetBusy() && petLife.current === PET_STATES.MOVING) {
+                updatePetStatus('我已经在往音乐盒那边走啦～');
+                return;
+            }
             wiggleHotspot(hotspotMusicbox);
             markPetInteraction();
-            openBGMModal();
+            updatePetStatus('正在去音乐盒…');
+            const preset = HOTSPOT_BEHAVIOR_PRESETS.musicbox;
+            const pCfg = typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null;
+            const path = buildPathToHotspot('musicbox', pCfg);
+            const onArriveMusicbox = () => {
+                if (preset && preset.vibrationPattern) triggerVibration(preset.vibrationPattern);
+                if (preset && typeof preset.moodDelta === 'number') {
+                    updateMoodAndHealth(preset.moodDelta, preset.healthDelta || 0);
+                }
+                if (preset && preset.context) triggerAIPetAction(preset.context);
+                if (typeof playPetAnimation === 'function') {
+                    playPetAnimation(preset ? preset.animationState : 'interact', { loop: false });
+                }
+                schedulePetTransition(PET_STATES.IDLE_BREATH, preset ? preset.stayMs : 2000);
+                openBGMModal();
+            };
+            if (path && path.length) {
+                walkPetAlongPath(path, {
+                    contextOverride: preset ? preset.context : '凑到音乐盒边晃了晃耳朵',
+                    stayMs: preset ? preset.stayMs : 2000,
+                    resetToDefault: false,
+                    onArrive: onArriveMusicbox
+                });
+            } else {
+                onArriveMusicbox();
+            }
         });
     }
 
@@ -11229,11 +11411,23 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 };
                 saveState();
 
-                // 3. 宠物房行为脚本：如果有 behaviorPlan，则在思考结束后按序执行；否则播放一段默认“回味”动画
-                if (Array.isArray(behaviorPlanFromAI) && behaviorPlanFromAI.length > 0 && typeof runBehaviorSequence === 'function') {
-                    runBehaviorSequence(behaviorPlanFromAI);
+                // 3. 宠物房行为脚本：normalize 后执行；无效则用默认 musicbox → diary
+                if (typeof runBehaviorSequence === 'function') {
+                    const normalizedPlan = typeof normalizeDiaryBehaviorPlan === 'function'
+                        ? normalizeDiaryBehaviorPlan(behaviorPlanFromAI)
+                        : [];
+                    const sequence = normalizedPlan.length > 0
+                        ? normalizedPlan
+                        : (typeof getDefaultPostCheckinBehaviorSequence === 'function'
+                            ? getDefaultPostCheckinBehaviorSequence()
+                            : []);
+                    if (sequence.length > 0) {
+                        runBehaviorSequence(sequence).catch((e) => console.error(e));
+                    } else {
+                        playExcitedAnimation();
+                    }
                 } else {
-                    playExcitedAnimation();                 // 宠物播放一次兴奋动画
+                    playExcitedAnimation();
                 }
             };
 
@@ -13784,7 +13978,13 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         let action = 'other';
         let keyFacts = ['互动'];
         if (decision.type === 'moveToHotspot' && decision.hotspot) {
-            const map = { bed: ['go_to_bed', '床', '休息'], cabinet: ['go_to_cabinet', '橱柜', '收藏'], pot: ['go_to_pot', '锅', '闻味道'] };
+            const map = {
+                bed: ['go_to_bed', '床', '休息'],
+                cabinet: ['go_to_cabinet', '橱柜', '收藏'],
+                pot: ['go_to_pot', '锅', '闻味道'],
+                musicbox: ['go_to_musicbox', '音乐盒', '听旋律'],
+                diary: ['go_to_diary', '日记', '回味旅行']
+            };
             const arr = map[decision.hotspot];
             if (arr) { action = arr[0]; keyFacts = [arr[1], arr[2]]; }
         } else if (decision.type === 'wander') {

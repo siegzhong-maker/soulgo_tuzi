@@ -1400,6 +1400,7 @@
             font-weight: 700;
             color: #374151;
             transform: translate(-50%, -50%);
+            z-index: 4;
         }
 
         .room-hotspot-button {
@@ -1480,8 +1481,9 @@
         .room-hotspot-musicbox {
             position: absolute;
             pointer-events: auto;
-            width: 96px;
+            width: 72px;
             height: auto;
+            z-index: 2;
             transform: translate(-50%, -50%);
             border: none;
             background: transparent;
@@ -2210,17 +2212,15 @@
             padding-bottom: 0.25rem;
         }
         #pet-dialog-text.npc-dialogue-emoji-only {
-            font-size: 2rem;
-            line-height: 1.35;
             text-align: center;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.04em;
         }
-        .npc-dialogue-bubble--emoji {
-            font-size: 1.75rem;
-            line-height: 1.3;
-            text-align: center;
-            letter-spacing: 0.06em;
-            padding: 0.65rem 0.85rem;
+        .npc-dialogue-thread .npc-dialogue-bubble--emoji {
+            font-size: 0.8125rem;
+            line-height: 1.45;
+            text-align: left;
+            letter-spacing: 0.02em;
+            padding: 0.5rem 0.75rem;
         }
 
         /* 旧房间内跟随气泡默认不展示，由底部对话栏替代 */
@@ -5035,7 +5035,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         musicbox: { left: 71.06, top: 64.08 }, // 音乐盒（坐标拾取）
         bed:   { left: 43, top: 15 },          // 床
         home:  { left: 55, top: 68 },          // 初始位置（地毯中心）
-        diary: { left: 72.29, top: 68.53 },    // 日记（坐标拾取）
+        diary: { left: 63.5, top: 71.5 },    // 日记（桌面书本区，避开音乐盒底座）
         pet_touch: { left: 70.43, top: 45.80 }, // 去摸我热点
         dialogue_history: { left: 74.72, top: 76.72 } // 旅行对话历史
         // 如果想覆盖 bed/cabinet 的像素坐标，也可以在这里添加，例如：
@@ -5084,7 +5084,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         pet_touch: { left: '67.20%', bottom: '43.00%' },
         // 音乐盒 / 日记：bottom = 100 - top（坐标拾取）
         musicbox: { left: '71.06%', bottom: '35.92%' },
-        diary: { left: '72.29%', bottom: '31.47%' }
+        diary: { left: '64%', bottom: '28.5%' }
     };
 
     const WANDER_AREAS = {
@@ -5223,6 +5223,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         }
 
         setPetDialogSpeaker(options.speaker || '小粟');
+        petDialogText.classList.remove('npc-dialogue-emoji-only');
         petDialogText.textContent = message;
 
         petDialogBar.classList.add('visible');
@@ -5236,6 +5237,12 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                 if (npcPikachuRoom) npcPikachuRoom.classList.remove('npc-speaking');
             }, duration);
         }
+    }
+
+    function formatNpcEmojiForHistory(raw) {
+        const s = String(raw || '').trim();
+        if (!s) return '';
+        return [...s].slice(0, 2).join('');
     }
 
     function npcLineDisplayEmoji(item) {
@@ -5252,12 +5259,12 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         const loc = location || '外面';
         const hasFood = diaryContent && /吃|味|香|甜|辣/.test(String(diaryContent));
         return [
-            { speaker: '小粟', emoji: hasFood ? '🌻😋🤤' : '🌻✨🗺️' },
-            { speaker: '比卡丘', emoji: '⚡👀❓' },
+            { speaker: '小粟', emoji: hasFood ? '🌻😋' : '🌻✨' },
+            { speaker: '比卡丘', emoji: '⚡👀' },
             { speaker: '小粟', emoji: hasFood ? '😋☀️' : '💛🌿' },
-            { speaker: '比卡丘', emoji: '⚡🎉✨' },
-            { speaker: '小粟', emoji: `📍${loc.length > 4 ? '🌻' : '🌻🧺'}` },
-            { speaker: '比卡丘', emoji: '⚡💪🔥' }
+            { speaker: '比卡丘', emoji: '⚡🎉' },
+            { speaker: '小粟', emoji: loc.length > 4 ? '📍🌻' : '🌻🧺' },
+            { speaker: '比卡丘', emoji: '⚡💪' }
         ];
     }
 
@@ -5268,7 +5275,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             if (!item || typeof item !== 'object') continue;
             const speaker = String(item.speaker || '').trim();
             if (speaker !== '小粟' && speaker !== '比卡丘') continue;
-            const emoji = npcLineDisplayEmoji(item);
+            const emoji = formatNpcEmojiForHistory(npcLineDisplayEmoji(item));
             if (!emoji) continue;
             lines.push({ speaker, emoji });
         }
@@ -5324,7 +5331,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
 
             const speaker = line.speaker === '比卡丘' ? '比卡丘' : '小粟';
             setPetDialogSpeaker(speaker);
-            petDialogText.textContent = line.emoji || line.text;
+            petDialogText.textContent = formatNpcEmojiForHistory(line.emoji || line.text);
             petDialogText.classList.add('npc-dialogue-emoji-only');
             petDialogBar.classList.add('visible');
 
@@ -6025,7 +6032,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             healthDelta: 0
         },
         diary: {
-            position: { left: '72.29%', bottom: '31.47%' },
+            position: { left: '64%', bottom: '28.5%' },
             context: '趴在日记本旁回味刚才的旅行',
             stayMs: 2200,
             animationState: 'idle_observe',
@@ -8933,7 +8940,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     }
 
     function renderNpcDialogueBubbleLine(line) {
-        const display = line && (line.emoji || line.text);
+        const display = formatNpcEmojiForHistory(line && (line.emoji || line.text));
         if (!display) return '';
         const isPikachu = line.speaker === '比卡丘';
         const cls = isPikachu ? 'pikachu' : 'xiaosu';
@@ -9019,7 +9026,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             const validLines = getValidNpcDialogueLines(entry.lines);
             const count = validLines.length;
             const preview = validLines[0]
-                ? String(validLines[0].emoji || validLines[0].text || '').slice(0, 12)
+                ? formatNpcEmojiForHistory(validLines[0].emoji || validLines[0].text || '')
                 : '';
             return `
                 <button type="button" data-dialogue-history-key="${escapeHtml(key)}"
@@ -9032,7 +9039,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
                         <span class="diary-paper-frame__chip diary-paper-frame__chip--muted shrink-0">${escapeHtml(date)}</span>
                     </div>
                     <div class="flex items-start justify-between gap-2 mt-0.5">
-                        <p class="text-lg leading-relaxed flex-1 min-w-0" aria-hidden="true">
+                        <p class="text-xs text-[#7a6b5a] leading-relaxed flex-1 min-w-0" style="text-shadow: 0 1px 0 rgba(255,255,255,0.45);">
                             ${escapeHtml(preview)}
                         </p>
                         <span class="text-sm leading-none shrink-0" aria-hidden="true">🌻⚡</span>
@@ -10579,38 +10586,8 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     if (hotspotDiary) {
         hotspotDiary.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (isPetBusy() && petLife.current === PET_STATES.MOVING) {
-                updatePetStatus('我已经在往日记那边走啦～');
-                return;
-            }
             wiggleHotspot(hotspotDiary);
-            markPetInteraction();
-            updatePetStatus('正在去翻日记…');
-            const preset = HOTSPOT_BEHAVIOR_PRESETS.diary;
-            const pCfg = typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null;
-            const path = buildPathToHotspot('diary', pCfg);
-            const onArriveDiary = () => {
-                if (preset && preset.vibrationPattern) triggerVibration(preset.vibrationPattern);
-                if (preset && typeof preset.moodDelta === 'number') {
-                    updateMoodAndHealth(preset.moodDelta, preset.healthDelta || 0);
-                }
-                if (preset && preset.context) triggerAIPetAction(preset.context);
-                if (typeof playPetAnimation === 'function') {
-                    playPetAnimation(preset ? preset.animationState : 'idle_observe', { loop: false });
-                }
-                schedulePetTransition(PET_STATES.IDLE_BREATH, preset ? preset.stayMs : 2200);
-                openDiaryModal();
-            };
-            if (path && path.length) {
-                walkPetAlongPath(path, {
-                    contextOverride: preset ? preset.context : '趴在日记本旁回味刚才的旅行',
-                    stayMs: preset ? preset.stayMs : 2200,
-                    resetToDefault: false,
-                    onArrive: onArriveDiary
-                });
-            } else {
-                onArriveDiary();
-            }
+            openDiaryModal();
         });
     }
 
@@ -10635,38 +10612,9 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     if (hotspotMusicbox) {
         hotspotMusicbox.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (isPetBusy() && petLife.current === PET_STATES.MOVING) {
-                updatePetStatus('我已经在往音乐盒那边走啦～');
-                return;
-            }
             wiggleHotspot(hotspotMusicbox);
             markPetInteraction();
-            updatePetStatus('正在去音乐盒…');
-            const preset = HOTSPOT_BEHAVIOR_PRESETS.musicbox;
-            const pCfg = typeof getCurrentPersonality === 'function' ? getCurrentPersonality() : null;
-            const path = buildPathToHotspot('musicbox', pCfg);
-            const onArriveMusicbox = () => {
-                if (preset && preset.vibrationPattern) triggerVibration(preset.vibrationPattern);
-                if (preset && typeof preset.moodDelta === 'number') {
-                    updateMoodAndHealth(preset.moodDelta, preset.healthDelta || 0);
-                }
-                if (preset && preset.context) triggerAIPetAction(preset.context);
-                if (typeof playPetAnimation === 'function') {
-                    playPetAnimation(preset ? preset.animationState : 'interact', { loop: false });
-                }
-                schedulePetTransition(PET_STATES.IDLE_BREATH, preset ? preset.stayMs : 2000);
-                openBGMModal();
-            };
-            if (path && path.length) {
-                walkPetAlongPath(path, {
-                    contextOverride: preset ? preset.context : '凑到音乐盒边晃了晃耳朵',
-                    stayMs: preset ? preset.stayMs : 2000,
-                    resetToDefault: false,
-                    onArrive: onArriveMusicbox
-                });
-            } else {
-                onArriveMusicbox();
-            }
+            openBGMModal();
         });
     }
 

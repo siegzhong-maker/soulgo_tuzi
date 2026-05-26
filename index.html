@@ -1481,7 +1481,7 @@
         .room-hotspot-musicbox {
             position: absolute;
             pointer-events: auto;
-            width: 72px;
+            width: 96px;
             height: auto;
             z-index: 2;
             transform: translate(-50%, -50%);
@@ -5032,7 +5032,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
     const HOTSPOT_POSITIONS_PCT = {
         pot:   { left: 19.52, top: 55.74 },    // 小锅（点击大锅上沿实测坐标）
         map:   { left: 24, top: 26 },          // 地图挂画（墙上空画框）
-        musicbox: { left: 71.06, top: 64.08 }, // 音乐盒（坐标拾取）
+        musicbox: { left: 75.12, top: 58.87 }, // 音乐盒（坐标拾取）
         bed:   { left: 43, top: 15 },          // 床
         home:  { left: 55, top: 68 },          // 初始位置（地毯中心）
         diary: { left: 80.27, top: 70.63 },    // 日记（坐标拾取）
@@ -5083,7 +5083,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
         // 去摸我热点：Left 67.20%, Top 57.00% → Bottom 43.00%
         pet_touch: { left: '67.20%', bottom: '43.00%' },
         // 音乐盒 / 日记：bottom = 100 - top（坐标拾取）
-        musicbox: { left: '71.06%', bottom: '35.92%' },
+        musicbox: { left: '75.12%', bottom: '41.13%' },
         diary: { left: '80.27%', bottom: '29.37%' }
     };
 
@@ -6022,7 +6022,7 @@ summary 30～50 字，第一人称「我」，可带味道、食材、天气与�
             healthDelta: 0
         },
         musicbox: {
-            position: { left: '71.06%', bottom: '35.92%' },
+            position: { left: '75.12%', bottom: '41.13%' },
             context: '凑到音乐盒边晃了晃耳朵',
             stayMs: 2000,
             animationState: 'interact',
